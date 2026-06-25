@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>NeuronIA</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0f0f0f;--surface:#181818;--panel:#212121;--border:#2a2a2a;
+  --accent:#c96442;--accent2:#d4824a;--accent-soft:#c9644222;
+  --text:#ececec;--muted:#666;--muted2:#999;
+  --green:#4caf88;--red:#e05c5c;--blue:#5c9fe0;--yellow:#f0b429;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --mono:'JetBrains Mono','Fira Code','Courier New',monospace;
+  --radius:14px;--safe-bottom:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden;font-size:16px}
+
+/* LAYOUT */
+#app{display:flex;flex-direction:column;height:100dvh;max-width:480px;margin:0 auto;position:relative;background:var(--bg)}
+
+/* SPLASH */
+#splash{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px}
+.splash-logo{width:80px;height:80px;border-radius:22px;background:linear-gradient(145deg,var(--accent),#e8855a);display:flex;align-items:center;justify-content:center;font-size:40px;box-shadow:0 0 40px #c9644340;animation:logoBreath 3s ease-in-out infinite}
+@keyframes logoBreath{0%,100%{box-shadow:0 0 30px #c9644330}50%{box-shadow:0 0 60px #c9644360}}
+.splash-title{font-size:1.8rem;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,var(--text),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.splash-sub{font-size:.85rem;color:var(--muted2);text-align:center;max-width:280px;line-height:1.6}
+.splash-progress{width:220px;height:3px;background:var(--border);border-radius:3px;overflow:hidden}
+.splash-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;width:0%;transition:width .4s ease}
+.splash-msg{font-size:.75rem;color:var(--muted);font-family:var(--mono)}
+
+/* TERMOS */
+#terms-screen{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;flex-direction:column;overflow:hidden}
+.terms-header{padding:20px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.terms-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(145deg,var(--accent),#e8855a);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.terms-body{flex:1;overflow-y:auto;padding:20px;-webkit-overflow-scrolling:touch}
+.terms-section{margin-bottom:20px}
+.terms-section h3{font-size:.75rem;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.terms-section li{font-size:.85rem;color:var(--muted2);line-height:1.7;margin-bottom:3px;list-style:none;padding-left:12px;position:relative}
+.terms-section li::before{content:'·';position:absolute;left:0;color:var(--accent)}
+.terms-footer{padding:16px 20px;padding-bottom:calc(16px + var(--safe-bottom));border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
+.check-row{display:flex;align-items:flex-start;gap:10px;cursor:pointer;-webkit-user-select:none;user-select:none}
+.check-row input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin-top:1px}
+.check-row span{font-size:.85rem;color:var(--muted2);line-height:1.4}
+#accept-btn{width:100%;padding:14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:.95rem;font-weight:700;font-family:var(--font);cursor:pointer;transition:opacity .2s;letter-spacing:-.2px}
+#accept-btn:disabled{opacity:.25;cursor:not-allowed}
+
+/* HEADER */
+#header{height:54px;flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:11px}
+.header-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(145deg,var(--accent),#e8855a);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+#header-title{font-size:.95rem;font-weight:700;flex:1}
+#header-status{display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--muted);flex-shrink:0}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+.dot.err{background:var(--red)}
+.dot.warn{background:var(--yellow)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#menu-btn{width:36px;height:36px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+
+/* BOTTOM NAV */
+#bottom-nav{height:58px;flex-shrink:0;background:var(--surface);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe-bottom)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;border:none;background:transparent;color:var(--muted);font-family:var(--font);font-size:.58rem;font-weight:500;transition:color .15s;-webkit-tap-highlight-color:transparent;position:relative}
+.nav-btn.active{color:var(--accent)}
+.nav-btn.active::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:20px;height:2px;background:var(--accent);border-radius:2px 2px 0 0}
+.nav-btn .icon{font-size:19px;line-height:1}
+.nav-badge{position:absolute;top:4px;right:calc(50% - 18px);width:16px;height:16px;background:var(--accent);border-radius:50%;font-size:.55rem;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+
+/* PAGES */
+.page{display:none;flex:1;overflow:hidden;flex-direction:column;min-height:0}
+.page.active{display:flex}
+
+/* CHAT */
+#chat-msgs{flex:1;overflow-y:auto;padding:16px 12px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+#chat-msgs::-webkit-scrollbar{display:none}
+.bubble-wrap{display:flex;flex-direction:column;gap:2px}
+.bubble-wrap.user{align-items:flex-end}
+.bubble-wrap.ai{align-items:flex-start}
+.bubble{max-width:84%;padding:10px 14px;border-radius:18px;font-size:.88rem;line-height:1.6;word-break:break-word;white-space:pre-wrap}
+.bubble.ai{background:var(--panel);border-bottom-left-radius:4px;color:var(--text);border:1px solid var(--border)}
+.bubble.user{background:var(--accent);border-bottom-right-radius:4px;color:#fff}
+.bubble-meta{font-size:.62rem;color:var(--muted);padding:0 4px;display:flex;align-items:center;gap:5px}
+.conf-badge{font-size:.58rem;padding:1px 6px;border-radius:8px;border:1px solid;font-weight:600}
+.conf-high{color:var(--green);border-color:#4caf8830;background:#4caf8810}
+.conf-mid{color:var(--yellow);border-color:#f0b42930;background:#f0b42910}
+.conf-low{color:var(--muted);border-color:var(--border);background:transparent}
+.typing-bubble{background:var(--panel);border-radius:18px;border-bottom-left-radius:4px;border:1px solid var(--border);padding:13px 16px;display:inline-flex;gap:5px;align-items:center}
+.dot-t{width:6px;height:6px;border-radius:50%;background:var(--muted2);animation:blink 1.4s infinite}
+.dot-t:nth-child(2){animation-delay:.2s}.dot-t:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.15;transform:scale(.7)}40%{opacity:1;transform:scale(1)}}
+.chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px 24px;text-align:center}
+.chat-empty .big{font-size:52px}
+.chat-empty h2{font-size:1rem;font-weight:700;color:var(--text)}
+.chat-empty p{font-size:.82rem;color:var(--muted);line-height:1.6;max-width:260px}
+.suggest-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:4px}
+.chip{padding:7px 13px;border-radius:20px;border:1px solid var(--border);background:var(--panel);color:var(--muted2);font-size:.78rem;cursor:pointer;transition:all .15s}
+.chip:active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent2)}
+
+/* INPUT BAR */
+#input-bar{padding:10px 12px;padding-bottom:calc(10px + var(--safe-bottom));background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:flex-end;gap:8px;flex-shrink:0}
+#msg-input{flex:1;background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:22px;padding:10px 16px;font-family:var(--font);font-size:.9rem;resize:none;min-height:42px;max-height:110px;line-height:1.4;outline:none;transition:border-color .2s;-webkit-appearance:none}
+#msg-input:focus{border-color:var(--accent)}
+#msg-input::placeholder{color:var(--muted)}
+#send-btn{width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;background:var(--accent);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+#send-btn:disabled{opacity:.25;cursor:not-allowed}
+#send-btn:not(:disabled):active{transform:scale(.9)}
+
+/* PAGE SCROLL */
+.page-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px}
+.card-title{font-size:.88rem;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card-sub{font-size:.78rem;color:var(--muted);line-height:1.5;margin-bottom:12px}
+
+/* TREINAR */
+.rlhf-q{font-size:.88rem;color:var(--text);line-height:1.55;background:var(--panel);border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid var(--border)}
+.rlhf-q-label{font-size:.65rem;color:var(--accent2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;font-weight:700}
+.opt-list{display:flex;flex-direction:column;gap:6px}
+.opt{background:var(--panel);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:.83rem;line-height:1.5;display:flex;gap:8px;align-items:flex-start;transition:all .15s}
+.opt:active,.opt.sel{border-color:var(--green);background:#4caf8812}
+.opt-n{width:22px;height:22px;border-radius:6px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.68rem;font-family:var(--mono);flex-shrink:0;color:var(--muted);transition:all .15s;font-weight:700}
+.opt.sel .opt-n{background:var(--green);border-color:var(--green);color:#fff}
+.rlhf-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.btn{padding:9px 14px;border-radius:10px;border:none;cursor:pointer;font-family:var(--font);font-size:.8rem;font-weight:600;transition:all .15s}
+.btn:active{opacity:.7;transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--panel);border:1px solid var(--border);color:var(--text)}
+.btn-warn{background:#f0b42915;border:1px solid #f0b42940;color:var(--yellow)}
+.btn-danger{background:#e05c5c15;border:1px solid #e05c5c40;color:var(--red)}
+.btn-block{width:100%;padding:13px;border-radius:12px;font-size:.88rem}
+.corr-box{display:none;margin-top:10px}
+.corr-input{width:100%;background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:10px;padding:10px 13px;font-family:var(--font);font-size:.85rem;resize:vertical;min-height:70px;outline:none;transition:border-color .15s}
+.corr-input:focus{border-color:var(--green)}
+.field-label{font-size:.72rem;color:var(--muted);margin-bottom:4px;font-weight:600}
+.field-input{width:100%;background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:10px;padding:10px 13px;font-family:var(--font);font-size:.85rem;outline:none;transition:border-color .15s;margin-bottom:8px}
+.field-input:focus{border-color:var(--accent)}
+
+/* TREINO CPU */
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}
+.metric{background:var(--panel);border-radius:10px;padding:10px 12px;text-align:center;border:1px solid var(--border)}
+.metric-val{font-size:1.1rem;font-weight:800;font-family:var(--mono);color:var(--accent2)}
+.metric-label{font-size:.62rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.bar-wrap{background:var(--panel);border-radius:6px;height:5px;overflow:hidden;margin:8px 0}
+.bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .5s ease}
+.log-box{background:#080808;border-radius:10px;padding:10px;font-family:var(--mono);font-size:.68rem;line-height:2;max-height:160px;overflow-y:auto;margin-top:8px;color:#555;border:1px solid #1a1a1a}
+.log-box::-webkit-scrollbar{display:none}
+.lc{color:var(--green)}.lw{color:var(--yellow)}.le{color:var(--red)}.li{color:var(--blue)}
+
+/* BIBLIOTECA */
+.lib-item{background:var(--panel);border-radius:11px;padding:12px;display:flex;align-items:center;gap:10px;border:1px solid var(--border)}
+.lib-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;background:var(--surface)}
+.lib-info{flex:1;min-width:0}
+.lib-name{font-size:.85rem;font-weight:600}
+.lib-desc{font-size:.72rem;color:var(--muted);margin-top:1px}
+.lib-btn{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:.75rem;cursor:pointer;font-family:var(--font);white-space:nowrap;transition:all .15s;font-weight:600}
+.lib-btn:active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.lib-badge{font-size:.62rem;padding:2px 7px;border-radius:8px;background:var(--accent-soft);color:var(--accent2);border:1px solid var(--accent);margin-top:3px;display:inline-block;font-weight:600}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;z-index:50;background:#00000090;backdrop-filter:blur(6px);display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px;padding-bottom:calc(20px + var(--safe-bottom));display:flex;flex-direction:column;gap:10px;animation:slideUp .25s ease;border-top:1px solid var(--border)}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-title{font-size:.92rem;font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.modal-row{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.modal-row:last-child{border:none}
+.modal-row-icon{font-size:20px;width:30px;flex-shrink:0}
+.modal-row-title{font-size:.86rem;font-weight:500}
+.modal-row-sub{font-size:.73rem;color:var(--muted)}
+
+/* TOAST */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--panel);border:1px solid var(--border);color:var(--text);padding:9px 18px;border-radius:24px;font-size:.8rem;z-index:300;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;max-width:calc(100vw - 32px);text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* TAGS */
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:.68rem;font-weight:600;letter-spacing:.2px}
+.tag-green{background:#4caf8818;color:var(--green);border:1px solid #4caf8835}
+.tag-red{background:#e05c5c18;color:var(--red);border:1px solid #e05c5c35}
+.tag-blue{background:#5c9fe018;color:var(--blue);border:1px solid #5c9fe035}
+.tag-amber{background:#f0b42918;color:var(--yellow);border:1px solid #f0b42935}
+
+/* PROGRESS RING */
+.progress-ring{display:flex;align-items:center;gap:10px;margin:8px 0}
+.ring-wrap{position:relative;width:44px;height:44px;flex-shrink:0}
+.ring-wrap svg{transform:rotate(-90deg)}
+.ring-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;font-family:var(--mono);color:var(--accent2)}
+.ring-label{font-size:.78rem;color:var(--muted2);line-height:1.4}
+
+/* STATS GRID */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stat-box{background:var(--panel);border-radius:9px;padding:9px;text-align:center;border:1px solid var(--border)}
+.stat-val{font-size:.95rem;font-weight:800;font-family:var(--mono);color:var(--text)}
+.stat-label{font-size:.6rem;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:.4px}
+
+/* KNOWLEDGE PREVIEW */
+.know-item{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:10px 12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.know-q{font-size:.8rem;color:var(--muted2);flex:1;line-height:1.4}
+.know-score{font-size:.65rem;font-family:var(--mono);color:var(--accent2);flex-shrink:0;background:var(--accent-soft);padding:2px 6px;border-radius:5px}
+.know-del{background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;padding:2px;line-height:1}
+.know-del:active{color:var(--red)}
+
+/* DESKTOP */
+@media(min-width:768px){
+  #app{max-width:100%;flex-direction:row}
+  #sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+  #bottom-nav{display:none}
+  #sidebar .nav-btn{flex-direction:row;justify-content:flex-start;padding:10px 14px;border-radius:9px;margin:2px 8px;font-size:.83rem;gap:10px;width:auto}
+  #sidebar .nav-btn::after{display:none}
+  #sidebar .nav-btn .icon{font-size:17px}
+  #sidebar nav{padding:8px 0;display:flex;flex-direction:column}
+  #sidebar .nav-btn.active{background:var(--accent-soft);color:var(--accent)}
+  #sidebar-logo{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+  #sidebar-logo-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(145deg,var(--accent),#e8855a);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+  #sidebar-logo h2{font-size:.9rem;font-weight:800}
+  #sidebar-logo p{font-size:.62rem;color:var(--muted);font-family:var(--mono)}
+  #main-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  #menu-btn{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-logo">🧠</div>
+  <div class="splash-title">NeuronIA</div>
+  <div class="splash-sub">IA local treinável em português</div>
+  <div class="splash-progress"><div class="splash-bar" id="splash-bar"></div></div>
+  <div class="splash-msg" id="splash-msg">Iniciando...</div>
+</div>
+
+<!-- TERMOS -->
+<div id="terms-screen">
+  <div class="terms-header">
+    <div class="terms-icon">🧠</div>
+    <div><h1 style="font-size:1rem;font-weight:800">NeuronIA</h1><p style="font-size:.73rem;color:var(--muted)">Termos de uso · v3.0</p></div>
+  </div>
+  <div class="terms-body">
+    <div class="terms-section">
+      <h3>🔒 Privacidade</h3>
+      <ul>
+        <li>Sem conta ou e-mail necessário.</li>
+        <li>Identificado por código anônimo local.</li>
+        <li>Todo processamento ocorre no seu navegador.</li>
+        <li>Dados ficam no IndexedDB do seu dispositivo.</li>
+      </ul>
+    </div>
+    <div class="terms-section">
+      <h3>🧠 Treinamento</h3>
+      <ul>
+        <li>IA usa TF-IDF + busca semântica — sem rede neural externa.</li>
+        <li>Aprende instantaneamente com cada par que você adiciona.</li>
+        <li>Quanto mais treinar, mais inteligente fica.</li>
+      </ul>
+    </div>
+    <div class="terms-section">
+      <h3>⚠️ Limitações</h3>
+      <ul>
+        <li>IA experimental — respostas dependem do treinamento.</li>
+        <li>Não use para decisões médicas ou jurídicas.</li>
+        <li>Proibido treinar com conteúdo ofensivo ou ilegal.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="terms-footer">
+    <label class="check-row"><input type="checkbox" id="ch1"/><span>Entendo que é uma IA experimental e aceito suas limitações</span></label>
+    <label class="check-row"><input type="checkbox" id="ch2"/><span>Li os termos — nenhum dado pessoal é coletado</span></label>
+    <button id="accept-btn" disabled>Aceitar e Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <div id="sidebar" style="display:none">
+    <div id="sidebar-logo">
+      <div id="sidebar-logo-icon">🧠</div>
+      <div><h2>NeuronIA</h2><p>v3.0 · Local</p></div>
+    </div>
+    <nav id="sidebar-nav"></nav>
+  </div>
+
+  <div id="main-area" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
+    <div id="header">
+      <div class="header-logo">🧠</div>
+      <div id="header-title">NeuronIA</div>
+      <div id="header-status"><div class="dot" id="status-dot"></div><span id="status-txt">...</span></div>
+      <button id="menu-btn" onclick="openModal('menu-modal')">☰</button>
+    </div>
+
+    <!-- PAGE: CHAT -->
+    <div class="page active" id="page-chat">
+      <div id="chat-msgs">
+        <div class="chat-empty" id="chat-empty">
+          <div class="big">🤖</div>
+          <h2>Olá! Sou o NeuronIA</h2>
+          <p>IA local que aprende com você. Sem servidores, sem internet necessária.</p>
+          <div class="suggest-chips">
+            <div class="chip" onclick="sendQuick('Quem é você?')">Quem é você?</div>
+            <div class="chip" onclick="sendQuick('Como você aprende?')">Como aprende?</div>
+            <div class="chip" onclick="sendQuick('Me conte uma piada')">Conta uma piada</div>
+            <div class="chip" onclick="sendQuick('O que você sabe fazer?')">O que você sabe?</div>
+          </div>
+        </div>
+      </div>
+      <div id="input-bar">
+        <textarea id="msg-input" placeholder="Digite uma mensagem..." rows="1"></textarea>
+        <button id="send-btn" disabled>➤</button>
+      </div>
+    </div>
+
+    <!-- PAGE: TREINAR -->
+    <div class="page" id="page-train">
+      <div class="page-scroll">
+        <div class="card">
+          <div class="card-title">📊 Conhecimento da IA</div>
+          <div class="stats-grid" id="kb-stats">
+            <div class="stat-box"><div class="stat-val" id="s-total">0</div><div class="stat-label">Pares</div></div>
+            <div class="stat-box"><div class="stat-val" id="s-vocab">0</div><div class="stat-label">Termos</div></div>
+            <div class="stat-box"><div class="stat-val" id="s-score">—</div><div class="stat-label">Confiança</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🎯 Treino por Feedback</div>
+          <div class="card-sub">A IA gera respostas — você aprova a melhor ou corrige. Isso é RLHF!</div>
+          <div id="rlhf-area"><div style="text-align:center;padding:24px;color:var(--muted)">Carregando...</div></div>
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="loadRLHF()">🔄 Novos exemplos</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">✏️ Adicionar par manual</div>
+          <div class="field-label">Pergunta / entrada</div>
+          <input class="field-input" id="man-q" placeholder="Ex: o que é fotossíntese?"/>
+          <div class="field-label">Resposta ideal</div>
+          <textarea class="field-input corr-input" id="man-r" rows="3" placeholder="Ex: é o processo pelo qual plantas convertem luz solar em energia..."></textarea>
+          <button class="btn btn-primary btn-block" style="margin-top:4px" onclick="addManual()">➕ Adicionar ao conhecimento</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📚 Conhecimento salvo</div>
+          <div class="card-sub">Toque em um item para ver detalhes ou deletar.</div>
+          <div id="know-list"><div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px">Carregando...</div></div>
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" id="know-more-btn" onclick="loadMoreKnow()">Ver mais</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: TREINO IA -->
+    <div class="page" id="page-cpu">
+      <div class="page-scroll">
+        <div class="card">
+          <div class="card-title">⚡ Otimizar IA</div>
+          <div class="card-sub">Recalcula os pesos TF-IDF e índices semânticos. Melhora a precisão das respostas sem treino externo.</div>
+          <div class="metrics">
+            <div class="metric"><div class="metric-val" id="m-pairs">—</div><div class="metric-label">Pares</div></div>
+            <div class="metric"><div class="metric-val" id="m-terms">—</div><div class="metric-label">Termos</div></div>
+            <div class="metric"><div class="metric-val" id="m-precision">—</div><div class="metric-label">Precisão</div></div>
+            <div class="metric"><div class="metric-val" id="m-time">—</div><div class="metric-label">Tempo</div></div>
+          </div>
+          <div class="bar-wrap"><div class="bar-fill" id="train-bar" style="width:0%"></div></div>
+          <div class="log-box" id="train-log"></div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-primary btn-block" id="btn-opt-start" onclick="runOptimize()">▶ Otimizar agora</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🧪 Testar IA</div>
+          <div class="card-sub">Digite uma pergunta e veja como a IA decide a resposta.</div>
+          <input class="field-input" id="test-q" placeholder="Teste uma pergunta..."/>
+          <button class="btn btn-primary" onclick="runTest()" style="margin-top:4px">Testar</button>
+          <div id="test-result" style="margin-top:10px;display:none">
+            <div class="log-box" id="test-log" style="max-height:200px"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🔁 Importar / Exportar</div>
+          <div class="card-sub">Salve ou carregue todo o conhecimento da IA em JSON.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost" onclick="exportKB()">⬇ Exportar JSON</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()">⬆ Importar JSON</button>
+            <button class="btn btn-danger" onclick="confirmClear()">🗑 Limpar tudo</button>
+          </div>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importKB(this)"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: BIBLIOTECAS -->
+    <div class="page" id="page-libs">
+      <div class="page-scroll">
+        <div class="card">
+          <div class="card-title">🌐 Fontes de dados</div>
+          <div class="card-sub">Busque dados públicos e adicione ao conhecimento da IA automaticamente.</div>
+        </div>
+        <div id="libs-list" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div class="card">
+          <div class="card-title">📥 Texto livre</div>
+          <div class="card-sub">Cole qualquer texto — a IA extrai pares de treino automaticamente.</div>
+          <textarea class="field-input corr-input" id="bulk-text" rows="5" placeholder="Cole um texto aqui... A IA vai extrair perguntas e respostas automaticamente."></textarea>
+          <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="processBulkText()">⚙️ Processar texto</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-area -->
+
+  <!-- BOTTOM NAV -->
+  <div id="bottom-nav">
+    <button class="nav-btn active" id="nav-chat" onclick="goPage('chat')"><span class="icon">💬</span>Chat</button>
+    <button class="nav-btn" id="nav-train" onclick="goPage('train')"><span class="icon">🎓</span>Treinar</button>
+    <button class="nav-btn" id="nav-cpu" onclick="goPage('cpu')"><span class="icon">⚡</span>Otimizar</button>
+    <button class="nav-btn" id="nav-libs" onclick="goPage('libs')"><span class="icon">🌐</span>Fontes</button>
+  </div>
+</div><!-- /app -->
+
+<!-- MENU MODAL -->
+<div class="modal-overlay" id="menu-modal" onclick="closeModal('menu-modal')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">Menu</div>
+    <div class="modal-row" onclick="goPage('chat');closeModal('menu-modal')"><div class="modal-row-icon">💬</div><div><div class="modal-row-title">Chat</div><div class="modal-row-sub">Conversar com a IA</div></div></div>
+    <div class="modal-row" onclick="goPage('train');closeModal('menu-modal')"><div class="modal-row-icon">🎓</div><div><div class="modal-row-title">Treinar</div><div class="modal-row-sub">Ensinar respostas corretas</div></div></div>
+    <div class="modal-row" onclick="goPage('cpu');closeModal('menu-modal')"><div class="modal-row-icon">⚡</div><div><div class="modal-row-title">Otimizar</div><div class="modal-row-sub">Melhorar precisão da IA</div></div></div>
+    <div class="modal-row" onclick="goPage('libs');closeModal('menu-modal')"><div class="modal-row-icon">🌐</div><div><div class="modal-row-title">Fontes</div><div class="modal-row-sub">Importar dados externos</div></div></div>
+    <div class="modal-row" onclick="resetTerms();closeModal('menu-modal')"><div class="modal-row-icon">🔒</div><div><div class="modal-row-title">Ver termos</div><div class="modal-row-sub">Privacidade e termos</div></div></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════
+// SUPABASE CONFIG (opcional)
+// ═══════════════════════════════
+const SB_URL = 'https://mphcruhuzrxugioqidi.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1waGNydWh1enJ4dWdpb2pxaWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDc2MzgsImV4cCI6MjA5Nzk4MzYzOH0.eJK7JRPqbUSYQVBkT4N6a4LSadAUGiBX7uEJFVMa1h0';
+let db = null, dbOk = false;
+
+// ═══════════════════════════════
+// BASE DE CONHECIMENTO LOCAL
+// ═══════════════════════════════
+// Cada item: { q, a, score, tags, ts }
+let KB = [];          // pares pergunta→resposta
+let tfidf = {};       // mapa palavra → IDF
+let knowPage = 0;
+const KNOW_PER_PAGE = 12;
+
+// ═══════════════════════════════
+// CONTEXTO DE CONVERSA
+// ═══════════════════════════════
+let convHistory = []; // últimas 6 trocas { q, a }
+
+// ═══════════════════════════════════════
+// PERSISTÊNCIA — IndexedDB
+// ═══════════════════════════════════════
+const DB_NAME = 'neuronia3', DB_VER = 1, STORE = 'kb';
+let idb = null;
+
+function openIDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        const s = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+        s.createIndex('score', 'score', { unique: false });
+      }
+    };
+    req.onsuccess = e => { idb = e.target.result; res(idb); };
+    req.onerror = e => rej(e.target.error);
+  });
+}
+
+async function idbGetAll() {
+  return new Promise((res, rej) => {
+    const tx = idb.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => res(req.result || []);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function idbPut(item) {
+  return new Promise((res, rej) => {
+    const tx = idb.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).put(item);
+    req.onsuccess = () => { item.id = req.result; res(item); };
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function idbDelete(id) {
+  return new Promise((res, rej) => {
+    const tx = idb.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).delete(id);
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function idbClear() {
+  return new Promise((res, rej) => {
+    const tx = idb.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).clear();
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+
+// ═══════════════════════════════
+// BOOT
+// ═══════════════════════════════
+window.addEventListener('load', () => {
+  const ch1 = document.getElementById('ch1');
+  const ch2 = document.getElementById('ch2');
+  const abtn = document.getElementById('accept-btn');
+  function checkT() { abtn.disabled = !(ch1.checked && ch2.checked); }
+  ch1.addEventListener('change', checkT);
+  ch2.addEventListener('change', checkT);
+  abtn.addEventListener('click', onAccept);
+  checkLayout();
+  window.addEventListener('resize', checkLayout);
+  const accepted = localStorage.getItem('nia_terms3');
+  if (accepted) { showApp(); boot(); } else showTerms();
+});
+
+function checkLayout() {
+  const sidebar = document.getElementById('sidebar');
+  if (window.innerWidth >= 768) {
+    sidebar.style.display = 'flex';
+    const sNav = document.getElementById('sidebar-nav');
+    if (!sNav.children.length) {
+      ['chat','train','cpu','libs'].forEach(id => {
+        const src = document.getElementById('nav-'+id);
+        if (!src) return;
+        const clone = src.cloneNode(true);
+        clone.id = 'snav-'+id; clone.onclick = () => goPage(id);
+        sNav.appendChild(clone);
+      });
+    }
+  } else { sidebar.style.display = 'none'; }
+}
+
+function showTerms() { document.getElementById('splash').style.display='none'; document.getElementById('terms-screen').style.display='flex'; }
+function onAccept() { localStorage.setItem('nia_terms3', Date.now()); document.getElementById('terms-screen').style.display='none'; showApp(); boot(); }
+function showApp() { document.getElementById('app').style.display='flex'; }
+function resetTerms() { localStorage.removeItem('nia_terms3'); location.reload(); }
+
+async function boot() {
+  splashProg('Abrindo banco local...', 10);
+  await openIDB();
+
+  splashProg('Carregando conhecimento...', 30);
+  KB = await idbGetAll();
+  if (KB.length === 0) await seedKB();
+
+  splashProg('Calculando TF-IDF...', 60);
+  rebuildTFIDF();
+
+  splashProg('Conectando Supabase (opcional)...', 80);
+  await trySupabase();
+
+  splashProg('Pronto!', 100);
+  await delay(300);
+  document.getElementById('splash').style.display = 'none';
+  document.getElementById('send-btn').disabled = false;
+  setupInput();
+  updateStats();
+  loadRLHF();
+  loadLibsList();
+  loadKnowList();
+}
+
+async function trySupabase() {
+  try {
+    if (!window.supabase) return;
+    db = window.supabase.createClient(SB_URL, SB_KEY);
+    const { error } = await db.from('treinamento').select('id').limit(1);
+    if (!error) { dbOk = true; setStatus('on', 'Conectado'); return; }
+  } catch(e) {}
+  setStatus('warn', 'Local');
+}
+
+// ═══════════════════════════════
+// SEED INICIAL
+// ═══════════════════════════════
+async function seedKB() {
+  const seed = [
+    { q:'quem é você', a:'Sou o NeuronIA, uma IA local treinável! Aprendo com tudo que você me ensina, direto no seu navegador, sem enviar dados a lugar nenhum.' },
+    { q:'o que você sabe fazer', a:'Posso responder perguntas sobre o que me ensinaram, aprender novos assuntos com você, e melhorar minhas respostas com cada treino!' },
+    { q:'como você aprende', a:'Aprendo com pares de pergunta e resposta que você adiciona. Uso TF-IDF e busca semântica para encontrar a resposta mais relevante.' },
+    { q:'você tem internet', a:'Não preciso de internet para funcionar! Tudo fica salvo no seu dispositivo usando IndexedDB.' },
+    { q:'olá', a:'Olá! Como posso ajudar hoje?' },
+    { q:'oi', a:'Oi! Pode perguntar o que quiser.' },
+    { q:'bom dia', a:'Bom dia! Em que posso ajudar?' },
+    { q:'boa tarde', a:'Boa tarde! Como vai?' },
+    { q:'boa noite', a:'Boa noite! Posso ajudar com alguma coisa?' },
+    { q:'obrigado', a:'De nada! Se precisar de mais alguma coisa, é só perguntar.' },
+    { q:'valeu', a:'Disponha! Sempre que precisar.' },
+    { q:'tchau', a:'Tchau! Até a próxima!' },
+    { q:'tudo bem', a:'Tudo ótimo! E com você?' },
+    { q:'me conte uma piada', a:'Por que o programador foi ao médico? Porque tinha um Java frio! 😄' },
+    { q:'conta uma piada', a:'O que o SQL disse para o banco de dados? Você pode me selecionar? 😄' },
+    { q:'qual é a capital do brasil', a:'A capital do Brasil é Brasília, inaugurada em 21 de abril de 1960 pelo presidente Juscelino Kubitschek.' },
+    { q:'quantos estados tem o brasil', a:'O Brasil tem 26 estados e o Distrito Federal, totalizando 27 unidades federativas.' },
+    { q:'o que é inteligência artificial', a:'Inteligência Artificial (IA) é um campo da computação que desenvolve sistemas capazes de simular capacidades cognitivas humanas, como aprender, raciocinar e resolver problemas.' },
+    { q:'o que é machine learning', a:'Machine Learning é uma subárea da IA onde sistemas aprendem automaticamente a partir de dados, melhorando com a experiência sem serem explicitamente programados.' },
+    { q:'o que é python', a:'Python é uma linguagem de programação de alto nível, conhecida por sua sintaxe simples e legível, muito usada em ciência de dados, IA, automação e desenvolvimento web.' },
+    { q:'o que é javascript', a:'JavaScript é a linguagem de programação da web, usada para criar interatividade em sites. Também roda no servidor com Node.js.' },
+    { q:'o que é html', a:'HTML (HyperText Markup Language) é a linguagem de marcação usada para estruturar o conteúdo de páginas web.' },
+    { q:'o que é css', a:'CSS (Cascading Style Sheets) é a linguagem que define a aparência visual de páginas HTML — cores, fontes, layout e muito mais.' },
+    { q:'o que é um algoritmo', a:'Um algoritmo é uma sequência de passos finita e bem definida para resolver um problema ou realizar uma tarefa.' },
+    { q:'o que é banco de dados', a:'Um banco de dados é um sistema organizado para armazenar, gerenciar e recuperar informações de forma eficiente.' },
+    { q:'o que é api', a:'API (Application Programming Interface) é um conjunto de regras que permite que dois softwares se comuniquem entre si.' },
+    { q:'o que é nuvem computação', a:'Computação em nuvem é o fornecimento de serviços de TI — servidores, armazenamento, software — pela internet, sem precisar de hardware local.' },
+    { q:'o que é tf-idf', a:'TF-IDF (Term Frequency–Inverse Document Frequency) é uma técnica de processamento de linguagem que mede a relevância de uma palavra em um documento em relação a uma coleção de documentos.' },
+    { q:'como fazer login', a:'Para fazer login em um site, você normalmente insere seu e-mail e senha no formulário de autenticação. Use sempre senhas fortes e únicas!' },
+    { q:'o que é criptografia', a:'Criptografia é a técnica de proteger informações convertendo-as em um formato ilegível, que só pode ser decifrado com a chave correta.' },
+    { q:'qual o maior país do mundo', a:'A Rússia é o maior país do mundo em extensão territorial, com mais de 17 milhões de km².' },
+    { q:'qual é a maior cidade do brasil', a:'São Paulo é a maior cidade do Brasil em população, com cerca de 12 milhões de habitantes na cidade e mais de 20 milhões na região metropolitana.' },
+    { q:'o que é fotossíntese', a:'Fotossíntese é o processo pelo qual plantas, algas e algumas bactérias convertem luz solar, água e CO₂ em glicose (energia) e oxigênio.' },
+    { q:'o que é o sol', a:'O Sol é uma estrela do tipo anã amarela, no centro do nosso sistema solar. Tem aproximadamente 4,6 bilhões de anos e é a principal fonte de energia da Terra.' },
+    { q:'o que é gravidade', a:'Gravidade é a força de atração entre dois corpos com massa. Na Terra, é o que mantém os objetos no solo e os planetas em órbita ao redor do Sol.' },
+  ];
+  for (const item of seed) {
+    const entry = { q: item.q, a: item.a, score: 5, tags: ['seed'], ts: Date.now() };
+    await idbPut(entry);
+    KB.push(entry);
+  }
+}
+
+// ═══════════════════════════════
+// TF-IDF ENGINE
+// ═══════════════════════════════
+function tokenize(text) {
+  return text.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 2 && !STOPWORDS.has(w));
+}
+
+const STOPWORDS = new Set([
+  'de','a','o','que','e','do','da','em','um','para','com','uma','os','no','se','na',
+  'por','mais','as','dos','como','mas','ao','ele','das','seu','sua','ou','quando',
+  'muito','nos','já','também','pela','pelo','foi','até','isso','ela','entre','depois',
+  'sem','mesmo','aos','durante','antes','nem','são','essa','este','esta','nós','você',
+  'eu','me','te','mim','nos','ele','ela','eles','elas','não','sim','é','estar','ser',
+  'ter','há','vai','vão','pode','tem','todos','todo','toda','cada','então','ainda',
+  'sobre','bem','só','aqui','ali','há','isso','aquilo','tudo','nada','onde','como','porque'
+]);
+
+function rebuildTFIDF() {
+  if (!KB.length) return;
+  const N = KB.length;
+  const df = {}; // document frequency por termo
+
+  // Calcula DF
+  for (const item of KB) {
+    const terms = new Set([...tokenize(item.q), ...tokenize(item.a)]);
+    terms.forEach(t => { df[t] = (df[t] || 0) + 1; });
+  }
+
+  // Calcula IDF com suavização
+  tfidf = {};
+  for (const [term, freq] of Object.entries(df)) {
+    tfidf[term] = Math.log((N + 1) / (freq + 1)) + 1;
+  }
+}
+
+function getVector(text) {
+  const terms = tokenize(text);
+  const tf = {};
+  terms.forEach(t => { tf[t] = (tf[t] || 0) + 1; });
+  const vec = {};
+  for (const [t, count] of Object.entries(tf)) {
+    const idf = tfidf[t] || Math.log((KB.length + 1) / 1) + 1;
+    vec[t] = (count / terms.length) * idf;
+  }
+  return vec;
+}
+
+function cosineSim(v1, v2) {
+  let dot = 0, n1 = 0, n2 = 0;
+  for (const [k, val] of Object.entries(v1)) { dot += val * (v2[k] || 0); n1 += val * val; }
+  for (const val of Object.values(v2)) { n2 += val * val; }
+  if (!n1 || !n2) return 0;
+  return dot / (Math.sqrt(n1) * Math.sqrt(n2));
+}
+
+// Bigrama similarity (fallback)
+function bigramSim(a, b) {
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+  const bg = s => { const set = new Set(); for (let i=0;i<s.length-1;i++) set.add(s.slice(i,i+2)); return set; };
+  const ba = bg(a), bb = bg(b);
+  if (!ba.size || !bb.size) return 0;
+  let n = 0; ba.forEach(v => { if (bb.has(v)) n++; });
+  return (2*n) / (ba.size + bb.size);
+}
+
+// ═══════════════════════════════
+// MOTOR DE RESPOSTA
+// ═══════════════════════════════
+function getReply(input) {
+  if (!KB.length) return { text: 'Ainda não tenho conhecimento. Adicione pares na aba Treinar!', confidence: 0 };
+
+  const inputNorm = input.toLowerCase().trim();
+  const inputVec = getVector(inputNorm);
+  const inputTokens = new Set(tokenize(inputNorm));
+
+  let bestScore = -1, bestItem = null, bestMethod = '';
+
+  for (const item of KB) {
+    const qNorm = item.q.toLowerCase();
+
+    // 1. Match exato
+    if (qNorm === inputNorm) { bestScore = 1.0; bestItem = item; bestMethod = 'exato'; break; }
+
+    // 2. TF-IDF cosine na pergunta
+    const qVec = getVector(qNorm);
+    const cosSim = cosineSim(inputVec, qVec);
+
+    // 3. Bigrama na pergunta
+    const bSim = bigramSim(inputNorm, qNorm);
+
+    // 4. Jaccard nos tokens
+    const qTokens = new Set(tokenize(qNorm));
+    const inter = [...inputTokens].filter(t => qTokens.has(t)).length;
+    const union = new Set([...inputTokens, ...qTokens]).size;
+    const jaccard = union > 0 ? inter / union : 0;
+
+    // 5. Boost por score de treino
+    const scoreMult = 1 + (item.score || 5) * 0.01;
+
+    // Score combinado ponderado
+    const combined = (cosSim * 0.50 + bSim * 0.30 + jaccard * 0.20) * scoreMult;
+
+    if (combined > bestScore) { bestScore = combined; bestItem = item; bestMethod = 'tfidf'; }
+  }
+
+  // Considera contexto da conversa
+  if (bestScore < 0.3 && convHistory.length > 0) {
+    const lastQ = convHistory[convHistory.length - 1]?.q || '';
+    const combined = inputNorm + ' ' + lastQ;
+    const ctxVec = getVector(combined);
+    for (const item of KB) {
+      const qVec = getVector(item.q.toLowerCase());
+      const s = cosineSim(ctxVec, qVec) * 0.9; // leve penalidade
+      if (s > bestScore) { bestScore = s; bestItem = item; bestMethod = 'contexto'; }
+    }
+  }
+
+  if (!bestItem || bestScore < 0.12) {
+    return { text: getGenericFallback(inputNorm), confidence: 0 };
+  }
+
+  const confidence = Math.min(bestScore, 1.0);
+
+  // Aprende implicitamente: aumenta score do item usado
+  if (bestScore > 0.5) {
+    bestItem.score = Math.min((bestItem.score || 5) + 0.5, 20);
+    idbPut(bestItem).catch(() => {});
+  }
+
+  return { text: bestItem.a, confidence, method: bestMethod, item: bestItem };
+}
+
+function getGenericFallback(input) {
+  const greetings = ['olá','oi','ei','hey','e aí','salve','oie'];
+  if (greetings.some(g => input.includes(g))) {
+    return ['Olá! Como posso ajudar?', 'Oi! Pode perguntar.', 'Ei! Estou aqui.'][Math.floor(Math.random()*3)];
+  }
+  const helps = ['me ensina','pode me dizer','me conta','me explica'];
+  if (helps.some(h => input.includes(h))) {
+    return 'Ainda não aprendi sobre isso. Você pode me ensinar na aba Treinar! 🎓';
+  }
+  const generics = [
+    'Ainda não tenho conhecimento sobre isso. Adicione na aba Treinar! 🎓',
+    'Não aprendi sobre isso ainda. Que tal me ensinar? Use a aba Treinar.',
+    'Boa pergunta! Ainda não sei responder. Me ensine na aba Treinar.',
+    'Meu conhecimento é limitado ao que me ensinaram. Adicione mais exemplos!',
+  ];
+  return generics[Math.floor(Math.random() * generics.length)];
+}
+
+// ═══════════════════════════════
+// CHAT
+// ═══════════════════════════════
+function setupInput() {
+  const ta = document.getElementById('msg-input');
+  const btn = document.getElementById('send-btn');
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 110) + 'px';
+    btn.disabled = !ta.value.trim();
+  });
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
+  });
+  btn.addEventListener('click', doSend);
+}
+
+function sendQuick(text) {
+  document.getElementById('msg-input').value = text;
+  doSend();
+}
+
+async function doSend() {
+  const ta = document.getElementById('msg-input');
+  const text = ta.value.trim();
+  if (!text) return;
+  if (!isSafe(text)) { toast('⚠️ Conteúdo não permitido'); return; }
+
+  ta.value = ''; ta.style.height = 'auto';
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('chat-empty')?.remove();
+
+  addBubble('user', text);
+  const typId = addTyping();
+
+  // Pequeno delay para parecer mais natural
+  await delay(200 + Math.random() * 300);
+
+  const result = getReply(text);
+  removeEl(typId);
+  addBubble('ai', result.text, result.confidence);
+
+  // Salva no histórico de contexto
+  convHistory.push({ q: text, a: result.text });
+  if (convHistory.length > 6) convHistory.shift();
+
+  // Salva no Supabase se disponível
+  if (dbOk) {
+    db.from('treinamento').insert({ pergunta: text, resposta: result.text, fonte: 'auto', aprovado: false, pontuacao: 1 }).catch(() => {});
+  }
+
+  document.getElementById('send-btn').disabled = false;
+}
+
+function addBubble(role, text, confidence) {
+  const wrap = document.getElementById('chat-msgs');
+  const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const div = document.createElement('div');
+  div.className = 'bubble-wrap ' + role;
+
+  let confBadge = '';
+  if (role === 'ai' && confidence !== undefined) {
+    const pct = Math.round(confidence * 100);
+    if (confidence >= 0.5) confBadge = `<span class="conf-badge conf-high">⚡ ${pct}%</span>`;
+    else if (confidence >= 0.25) confBadge = `<span class="conf-badge conf-mid">~ ${pct}%</span>`;
+    else if (confidence > 0) confBadge = `<span class="conf-badge conf-low">? ${pct}%</span>`;
+  }
+
+  div.innerHTML = `<div class="bubble ${role}">${esc(text)}</div><div class="bubble-meta">${time}${confBadge ? ' ' + confBadge : ''}</div>`;
+  wrap.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function addTyping() {
+  const wrap = document.getElementById('chat-msgs');
+  const id = 'ty' + Date.now();
+  const div = document.createElement('div');
+  div.className = 'bubble-wrap ai'; div.id = id;
+  div.innerHTML = '<div class="typing-bubble"><div class="dot-t"></div><div class="dot-t"></div><div class="dot-t"></div></div>';
+  wrap.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  return id;
+}
+
+// ═══════════════════════════════
+// RLHF TREINO
+// ═══════════════════════════════
+async function loadRLHF() {
+  const area = document.getElementById('rlhf-area');
+  if (!KB.length) {
+    area.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:16px">Sem pares ainda. Adicione abaixo!</div>';
+    return;
+  }
+
+  // Pega pares com menor score para revisar
+  const sample = [...KB].sort((a, b) => (a.score || 5) - (b.score || 5)).slice(0, 3);
+  area.innerHTML = '';
+
+  for (const item of sample) {
+    // Gera 3 variações de resposta para escolha
+    const alts = generateAlternatives(item.q, item.a);
+    const card = document.createElement('div');
+    card.className = 'card'; card.style.cssText = 'margin-bottom:10px';
+    card.dataset.itemId = item.id;
+    card.dataset.escolha = '';
+    card.innerHTML = `
+      <div class="rlhf-q-label">Qual resposta é melhor?</div>
+      <div class="rlhf-q">${esc(item.q)}</div>
+      <div class="opt-list">
+        ${alts.map((r, i) => `<div class="opt" onclick="pickOpt(this,${i})" data-idx="${i}">
+          <div class="opt-n">${i + 1}</div><div style="flex:1;font-size:.82rem">${esc(r)}</div>
+        </div>`).join('')}
+      </div>
+      <div class="rlhf-actions">
+        <button class="btn btn-primary" onclick="confirmRLHF(this)">✓ Confirmar</button>
+        <button class="btn btn-warn" onclick="skipRLHF(this)">Pular</button>
+        <button class="btn btn-ghost" onclick="toggleCorr(this)">✏️ Escrever</button>
+      </div>
+      <div class="corr-box">
+        <textarea class="corr-input" placeholder="Escreva a resposta ideal..."></textarea>
+        <button class="btn btn-primary" style="margin-top:8px" onclick="sendCorr(this)">Salvar resposta</button>
+      </div>`;
+    area.appendChild(card);
+  }
+}
+
+function generateAlternatives(q, bestAnswer) {
+  // Resposta 1: a melhor conhecida
+  const a1 = bestAnswer;
+  // Resposta 2: busca similar na KB (segunda melhor)
+  const candidates = KB.filter(k => k.id !== KB.find(i => i.a === bestAnswer)?.id);
+  const qVec = getVector(q.toLowerCase());
+  let a2 = null, best2 = 0;
+  for (const k of candidates) {
+    const s = cosineSim(qVec, getVector(k.q.toLowerCase()));
+    if (s > best2) { best2 = s; a2 = k.a; }
+  }
+  // Resposta 3: fallback
+  const a3 = getGenericFallback(q.toLowerCase());
+  const alts = [a1, a2 || 'Não sei responder isso ainda.', a3];
+  // Shuffle para não ser sempre a 1 no topo
+  return alts.sort(() => Math.random() - 0.5);
+}
+
+function pickOpt(el, idx) {
+  el.closest('.opt-list').querySelectorAll('.opt').forEach(o => o.classList.remove('sel'));
+  el.classList.add('sel');
+  el.closest('.card').dataset.escolha = idx;
+  el.closest('.card').dataset.escolhaText = el.querySelector('div:last-child').textContent;
+}
+
+async function confirmRLHF(btn) {
+  const card = btn.closest('.card');
+  const text = card.dataset.escolhaText;
+  if (!text) { toast('Escolha uma opção'); return; }
+  const id = parseInt(card.dataset.itemId);
+  const item = KB.find(k => k.id === id);
+  if (item) {
+    item.a = text;
+    item.score = (item.score || 5) + 2;
+    await idbPut(item);
+    rebuildTFIDF();
+  }
+  card.style.opacity = '.3'; card.style.pointerEvents = 'none';
+  toast('✅ IA aprendeu com sua escolha!');
+  setTimeout(loadRLHF, 1000);
+  updateStats();
+}
+
+function skipRLHF(btn) {
+  const card = btn.closest('.card');
+  card.style.opacity = '.3'; card.style.pointerEvents = 'none';
+  toast('Pulado');
+}
+
+function toggleCorr(btn) {
+  const box = btn.closest('.card').querySelector('.corr-box');
+  box.style.display = box.style.display === 'block' ? 'none' : 'block';
+}
+
+async function sendCorr(btn) {
+  const card = btn.closest('.card');
+  const txt = btn.closest('.corr-box').querySelector('.corr-input').value.trim();
+  if (!txt || !isSafe(txt)) { toast('Texto inválido'); return; }
+  const id = parseInt(card.dataset.itemId);
+  const item = KB.find(k => k.id === id);
+  if (item) {
+    item.a = txt;
+    item.score = (item.score || 5) + 3;
+    await idbPut(item);
+    rebuildTFIDF();
+  }
+  card.style.opacity = '.3'; card.style.pointerEvents = 'none';
+  toast('✅ Correção salva!');
+  setTimeout(loadRLHF, 1000);
+  updateStats();
+}
+
+// ═══════════════════════════════
+// ADICIONAR MANUAL
+// ═══════════════════════════════
+async function addManual() {
+  const q = document.getElementById('man-q').value.trim();
+  const r = document.getElementById('man-r').value.trim();
+  if (!q || !r) { toast('Preencha pergunta e resposta'); return; }
+  if (!isSafe(q) || !isSafe(r)) { toast('Conteúdo não permitido'); return; }
+
+  // Verifica duplicata
+  const dup = KB.find(k => bigramSim(k.q.toLowerCase(), q.toLowerCase()) > 0.85);
+  if (dup) {
+    dup.a = r; dup.score = (dup.score || 5) + 2;
+    await idbPut(dup);
+    toast('♻️ Par existente atualizado!');
+  } else {
+    const item = { q, a: r, score: 7, tags: ['manual'], ts: Date.now() };
+    await idbPut(item);
+    KB.push(item);
+    toast('✅ Par adicionado ao conhecimento!');
+  }
+
+  document.getElementById('man-q').value = '';
+  document.getElementById('man-r').value = '';
+  rebuildTFIDF();
+  updateStats();
+  loadKnowList();
+
+  // Sincroniza Supabase
+  if (dbOk) db.from('treinamento').insert({ pergunta: q, resposta: r, fonte: 'manual', aprovado: true, pontuacao: 7 }).catch(() => {});
+}
+
+// ═══════════════════════════════
+// LISTA DE CONHECIMENTO
+// ═══════════════════════════════
+let knowPageOffset = 0;
+function loadKnowList(reset = true) {
+  if (reset) knowPageOffset = 0;
+  const el = document.getElementById('know-list');
+  const sorted = [...KB].sort((a, b) => (b.score || 5) - (a.score || 5));
+  const slice = sorted.slice(knowPageOffset, knowPageOffset + KNOW_PER_PAGE);
+  const html = slice.map(item => `
+    <div class="know-item">
+      <div>
+        <div class="know-q">${esc(item.q)}</div>
+        <div style="font-size:.7rem;color:var(--muted);margin-top:2px">${esc(item.a.slice(0, 60))}${item.a.length > 60 ? '…' : ''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <span class="know-score">⭐ ${(item.score||5).toFixed(1)}</span>
+        <button class="know-del" onclick="deleteKnow(${item.id})">🗑</button>
+      </div>
+    </div>`).join('');
+  if (reset) el.innerHTML = html || '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px">Sem itens.</div>';
+  else el.innerHTML += html;
+  document.getElementById('know-more-btn').style.display = knowPageOffset + KNOW_PER_PAGE < KB.length ? 'block' : 'none';
+}
+
+function loadMoreKnow() {
+  knowPageOffset += KNOW_PER_PAGE;
+  loadKnowList(false);
+}
+
+async function deleteKnow(id) {
+  if (!confirm('Deletar este par de conhecimento?')) return;
+  await idbDelete(id);
+  KB = KB.filter(k => k.id !== id);
+  rebuildTFIDF();
+  updateStats();
+  loadKnowList();
+  toast('🗑 Par removido');
+}
+
+// ═══════════════════════════════
+// OTIMIZAR IA (substitui treino CPU)
+// ═══════════════════════════════
+async function runOptimize() {
+  const btn = document.getElementById('btn-opt-start');
+  btn.disabled = true;
+  const t0 = Date.now();
+  tlog('Iniciando otimização...', 'i');
+  document.getElementById('train-bar').style.width = '0%';
+
+  tlog(`${KB.length} pares carregados`, 'ok');
+  document.getElementById('train-bar').style.width = '20%';
+  await tick();
+
+  // Recalcula TF-IDF
+  tlog('Recalculando TF-IDF...', 'i');
+  rebuildTFIDF();
+  const termCount = Object.keys(tfidf).length;
+  document.getElementById('train-bar').style.width = '50%';
+  await tick();
+
+  // Auto-normaliza scores
+  tlog('Normalizando scores...', 'i');
+  let improved = 0;
+  for (const item of KB) {
+    const qTokens = tokenize(item.q);
+    const aTokens = tokenize(item.a);
+    // Itens com respostas mais ricas ganham boost
+    if (aTokens.length > 10 && item.score < 8) { item.score = Math.min(item.score + 0.5, 10); improved++; await idbPut(item); }
+    // Itens muito genéricos perdem um pouco
+    if (aTokens.length < 3 && item.score > 3) { item.score = Math.max(item.score - 0.5, 1); await idbPut(item); }
+  }
+  document.getElementById('train-bar').style.width = '75%';
+  await tick();
+
+  // Estima precision com auto-teste
+  let correct = 0;
+  const testSample = KB.slice(0, Math.min(30, KB.length));
+  for (const item of testSample) {
+    const res = getReply(item.q);
+    if (res.text === item.a) correct++;
+  }
+  const precision = testSample.length ? Math.round((correct / testSample.length) * 100) : 0;
+  document.getElementById('train-bar').style.width = '100%';
+
+  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+  document.getElementById('m-pairs').textContent = KB.length;
+  document.getElementById('m-terms').textContent = termCount;
+  document.getElementById('m-precision').textContent = precision + '%';
+  document.getElementById('m-time').textContent = elapsed + 's';
+
+  tlog(`TF-IDF: ${termCount} termos indexados`, 'ok');
+  tlog(`Scores normalizados: ${improved} melhorados`, 'ok');
+  tlog(`Auto-teste: ${precision}% de precisão`, precision >= 80 ? 'ok' : 'w');
+  tlog(`Concluído em ${elapsed}s ✓`, 'ok');
+
+  btn.disabled = false;
+  toast(`✅ IA otimizada! Precisão: ${precision}%`);
+  updateStats();
+}
+
+async function runTest() {
+  const q = document.getElementById('test-q').value.trim();
+  if (!q) { toast('Digite uma pergunta para testar'); return; }
+  const result = document.getElementById('test-result');
+  const log = document.getElementById('test-log');
+  result.style.display = 'block';
+  log.innerHTML = '';
+
+  tlog2(log, `Entrada: "${q}"`, 'i');
+  const qNorm = q.toLowerCase();
+  const qVec = getVector(qNorm);
+  const top5 = [...KB].map(item => ({
+    item,
+    score: cosineSim(qVec, getVector(item.q.toLowerCase()))
+  })).sort((a, b) => b.score - a.score).slice(0, 5);
+
+  tlog2(log, 'Top 5 candidatos:', 'i');
+  top5.forEach((c, i) => tlog2(log, `${i+1}. [${(c.score*100).toFixed(0)}%] ${c.item.q.slice(0, 40)}`, c.score > 0.5 ? 'ok' : 'w'));
+
+  const reply = getReply(q);
+  tlog2(log, `Confiança: ${(reply.confidence*100).toFixed(0)}%`, reply.confidence >= 0.5 ? 'ok' : 'w');
+  tlog2(log, `Resposta: ${reply.text.slice(0, 80)}...`, 'ok');
+}
+
+function tlog2(el, msg, type) {
+  const cls = {ok:'lc',w:'lw',e:'le',i:'li'}[type]||'li';
+  el.innerHTML += `<div><span class="${cls}">${esc(msg)}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════
+// EXPORT / IMPORT
+// ═══════════════════════════════
+function exportKB() {
+  const data = { version: 3, ts: Date.now(), count: KB.length, kb: KB };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `neuronia_kb_${Date.now()}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast(`⬇ ${KB.length} pares exportados`);
+}
+
+async function importKB(input) {
+  const file = input.files[0]; if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const items = data.kb || data;
+    let count = 0;
+    for (const item of (Array.isArray(items) ? items : [])) {
+      if (!item.q || !item.a || !isSafe(item.q) || !isSafe(item.a)) continue;
+      const entry = { q: item.q, a: item.a, score: item.score || 5, tags: item.tags || ['imported'], ts: Date.now() };
+      await idbPut(entry);
+      KB.push(entry);
+      count++;
+    }
+    rebuildTFIDF(); updateStats(); loadKnowList();
+    toast(`⬆ ${count} pares importados!`);
+  } catch(e) { toast('Erro ao importar: ' + e.message); }
+  input.value = '';
+}
+
+function confirmClear() {
+  if (!confirm('Limpar TODO o conhecimento? Isso não pode ser desfeito.')) return;
+  idbClear().then(() => { KB = []; tfidf = {}; updateStats(); loadKnowList(); toast('🗑 Conhecimento apagado'); });
+}
+
+// ═══════════════════════════════
+// PROCESSO TEXTO LIVRE
+// ═══════════════════════════════
+async function processBulkText() {
+  const text = document.getElementById('bulk-text').value.trim();
+  if (!text || text.length < 50) { toast('Texto muito curto (mínimo 50 caracteres)'); return; }
+
+  const sentences = text.split(/[.!?\n]+/).map(s => s.trim()).filter(s => s.split(' ').length >= 5 && s.length > 20 && isSafe(s));
+  let added = 0;
+
+  for (let i = 0; i < sentences.length - 1; i++) {
+    const s = sentences[i];
+    // Detecta pares frase→explicação natural
+    if (s.toLowerCase().startsWith('o que é') || s.toLowerCase().startsWith('como') || s.toLowerCase().startsWith('por que') || s.toLowerCase().startsWith('qual')) {
+      const next = sentences[i + 1];
+      if (next) {
+        const item = { q: s, a: next, score: 4, tags: ['bulk'], ts: Date.now() };
+        await idbPut(item); KB.push(item); added++; i++;
+      }
+    } else if (i < sentences.length - 1) {
+      // Cria par pergunta automática
+      const words = s.split(' ').slice(0, 6).join(' ');
+      const q = 'O que significa: "' + words + '"?';
+      const item = { q, a: s, score: 3, tags: ['auto-bulk'], ts: Date.now() };
+      await idbPut(item); KB.push(item); added++;
+    }
+  }
+
+  document.getElementById('bulk-text').value = '';
+  rebuildTFIDF(); updateStats(); loadKnowList();
+  toast(`✅ ${added} pares extraídos do texto!`);
+}
+
+// ═══════════════════════════════
+// BIBLIOTECAS EXTERNAS
+// ═══════════════════════════════
+const LIBS = [
+  { id:'wiki', icon:'🌍', name:'Wikipedia PT', desc:'Artigo aleatório em português', fn: fetchWiki },
+  { id:'gutendex', icon:'📚', name:'Livros PT (Gutendex)', desc:'Obras de domínio público', fn: fetchGutendex },
+  { id:'dialogs', icon:'🗣️', name:'Diálogos PT', desc:'Conversas informais em português', fn: fetchDialogs },
+  { id:'facts', icon:'🧪', name:'Fatos de ciência', desc:'Fatos científicos gerais', fn: fetchFacts },
+];
+
+function loadLibsList() {
+  document.getElementById('libs-list').innerHTML = LIBS.map(lib => `
+    <div class="lib-item">
+      <div class="lib-icon">${lib.icon}</div>
+      <div class="lib-info">
+        <div class="lib-name">${lib.name}</div>
+        <div class="lib-desc">${lib.desc}</div>
+        <div id="lib-stat-${lib.id}"></div>
+      </div>
+      <button class="lib-btn" id="lib-btn-${lib.id}" onclick="runLib('${lib.id}')">Buscar</button>
+    </div>`).join('');
+}
+
+async function runLib(id) {
+  const lib = LIBS.find(l => l.id === id);
+  if (!lib) return;
+  const btn = document.getElementById('lib-btn-' + id);
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const count = await lib.fn();
+    rebuildTFIDF(); updateStats(); loadKnowList();
+    btn.textContent = '✓';
+    document.getElementById('lib-stat-' + id).innerHTML = `<span class="lib-badge">+${count} itens</span>`;
+    toast(`${lib.icon} ${count} itens adicionados!`);
+  } catch(e) {
+    btn.textContent = 'Erro';
+    toast('Erro: ' + (e.message || 'desconhecido'));
+    console.error(e);
+  } finally { setTimeout(() => { btn.disabled = false; btn.textContent = 'Buscar'; }, 3000); }
+}
+
+async function fetchWiki() {
+  const resp = await fetch('https://pt.wikipedia.org/api/rest_v1/page/random/summary');
+  if (!resp.ok) throw new Error('Wikipedia indisponível');
+  const data = await resp.json();
+  if (!data.extract || !data.title) throw new Error('Sem conteúdo');
+  const sentences = data.extract.split(/[.!]+/).map(s => s.trim()).filter(s => s.split(' ').length >= 6);
+  let count = 0;
+  // Par principal
+  const item = { q: `O que é ${data.title}?`, a: sentences[0] || data.extract.slice(0, 200), score: 5, tags: ['wikipedia'], ts: Date.now() };
+  if (isSafe(item.q) && isSafe(item.a)) { await idbPut(item); KB.push(item); count++; }
+  // Pares adicionais
+  for (let i = 1; i < Math.min(sentences.length, 5); i++) {
+    const words = sentences[i].split(' ').slice(0, 5).join(' ');
+    const q2 = `Sobre ${data.title}: ${words}?`;
+    const it2 = { q: q2, a: sentences[i], score: 3, tags: ['wikipedia-extra'], ts: Date.now() };
+    if (isSafe(it2.q) && isSafe(it2.a) && it2.a.length > 20) { await idbPut(it2); KB.push(it2); count++; }
+  }
+  return count;
+}
+
+async function fetchGutendex() {
+  const pg = Math.floor(Math.random() * 5) + 1;
+  const resp = await fetch(`https://gutendex.com/books/?languages=pt&page=${pg}`);
+  if (!resp.ok) throw new Error('Gutendex indisponível');
+  const data = await resp.json();
+  let count = 0;
+  for (const book of (data.results || []).slice(0, 8)) {
+    const titulo = book.title || '';
+    const autor = book.authors?.[0]?.name || 'Desconhecido';
+    const item = { q: `Quem escreveu "${titulo}"?`, a: `"${titulo}" foi escrito por ${autor} e está em domínio público.`, score: 4, tags: ['gutendex'], ts: Date.now() };
+    if (isSafe(item.q)) { await idbPut(item); KB.push(item); count++; }
+  }
+  return count;
+}
+
+async function fetchDialogs() {
+  const pairs = [
+    ['o que você acha disso?','Acho muito interessante! Me conta mais sobre o assunto.'],
+    ['não sei o que fazer','Vamos pensar juntos! Me descreve melhor a situação.'],
+    ['estou com dificuldade','Que tipo de dificuldade? Posso tentar te ajudar!'],
+    ['você pode me ajudar?','Claro! Me diga o que precisa.'],
+    ['isso faz sentido?','Faz sim! Pode continuar, estou acompanhando.'],
+    ['o que você recomenda?','Depende do contexto! Me conta mais detalhes para eu sugerir algo.'],
+    ['como posso aprender mais?','Praticando, lendo e tendo curiosidade! O aprendizado é contínuo.'],
+    ['você sabe tudo?','Não! Ainda estou aprendendo. Você pode me ensinar coisas novas!'],
+    ['isso é verdade?','Não tenho certeza absoluta. Para informações críticas, consulte fontes confiáveis!'],
+    ['me dê um exemplo','Com certeza! Me diz sobre qual assunto quer um exemplo.'],
+    ['você entende português?','Sim! Sou treinado em português. Pode falar à vontade!'],
+    ['que horas são?','Não tenho acesso ao horário em tempo real, mas você pode verificar no seu dispositivo!'],
+    ['qual é o seu objetivo?','Meu objetivo é aprender com você e ajudar no que puder!'],
+    ['você é real?','Sou um programa de computador, mas meu aprendizado é real — você me ensina!'],
+    ['como foi criado?','Fui construído com HTML, CSS e JavaScript puro. Sem servidores, sem internet!'],
+    ['você tem memória?','Sim! Guardo tudo no IndexedDB do seu navegador. Persiste entre sessões!'],
+  ];
+  let count = 0;
+  for (const [q, a] of pairs) {
+    if (KB.some(k => bigramSim(k.q.toLowerCase(), q) > 0.9)) continue;
+    const item = { q, a, score: 5, tags: ['dialogs'], ts: Date.now() };
+    await idbPut(item); KB.push(item); count++;
+  }
+  return count;
+}
+
+async function fetchFacts() {
+  const facts = [
+    ['qual é a velocidade da luz?','A velocidade da luz no vácuo é aproximadamente 299.792.458 metros por segundo (≈ 300.000 km/s).'],
+    ['quantos planetas tem o sistema solar?','O sistema solar tem 8 planetas: Mercúrio, Vênus, Terra, Marte, Júpiter, Saturno, Urano e Netuno.'],
+    ['o que é DNA?','DNA (Ácido Desoxirribonucleico) é a molécula que carrega as informações genéticas de todos os seres vivos.'],
+    ['o que é o big bang?','O Big Bang é a teoria científica que descreve a origem do universo, ocorrida há aproximadamente 13,8 bilhões de anos.'],
+    ['o que é átomo?','O átomo é a menor unidade de um elemento químico que ainda mantém suas propriedades. É formado por prótons, nêutrons e elétrons.'],
+    ['o que é célula?','A célula é a unidade básica da vida. Todo ser vivo é formado por uma ou mais células.'],
+    ['o que é evolução?','A evolução é o processo pelo qual espécies mudam ao longo do tempo, descrito pela teoria de Charles Darwin.'],
+    ['o que é energia?','Energia é a capacidade de realizar trabalho. Pode se apresentar em diversas formas: cinética, potencial, térmica, luminosa, etc.'],
+    ['o que é força de atrito?','A força de atrito é uma força que se opõe ao movimento relativo entre duas superfícies em contato.'],
+    ['o que é pressão?','Pressão é a força aplicada por unidade de área. A unidade no SI é o Pascal (Pa) = N/m².'],
+  ];
+  let count = 0;
+  for (const [q, a] of facts) {
+    if (KB.some(k => bigramSim(k.q.toLowerCase(), q) > 0.9)) continue;
+    const item = { q, a, score: 6, tags: ['science'], ts: Date.now() };
+    await idbPut(item); KB.push(item); count++;
+  }
+  return count;
+}
+
+// ═══════════════════════════════
+// STATS
+// ═══════════════════════════════
+function updateStats() {
+  document.getElementById('s-total').textContent = KB.length;
+  document.getElementById('s-vocab').textContent = Object.keys(tfidf).length;
+  const avgConf = KB.length > 0 ? (KB.reduce((s,k) => s + (k.score||5), 0) / KB.length).toFixed(1) : '—';
+  document.getElementById('s-score').textContent = avgConf;
+  // Badges
+  if (KB.length > 0) {
+    const badge = document.getElementById('nav-train');
+    if (badge) badge.style.position = 'relative';
+  }
+}
+
+// ═══════════════════════════════
+// NAVEGAÇÃO
+// ═══════════════════════════════
+const PAGES = ['chat','train','cpu','libs'];
+function goPage(name) {
+  PAGES.forEach(p => {
+    document.getElementById('page-'+p)?.classList.remove('active');
+    document.getElementById('nav-'+p)?.classList.remove('active');
+    document.getElementById('snav-'+p)?.classList.remove('active');
+  });
+  document.getElementById('page-'+name)?.classList.add('active');
+  document.getElementById('nav-'+name)?.classList.add('active');
+  document.getElementById('snav-'+name)?.classList.add('active');
+  const titles = { chat:'NeuronIA', train:'Treinar IA', cpu:'Otimizar IA', libs:'Fontes de Dados' };
+  document.getElementById('header-title').textContent = titles[name] || 'NeuronIA';
+  if (name === 'train') { loadKnowList(); loadRLHF(); }
+}
+
+// ═══════════════════════════════
+// MODAIS
+// ═══════════════════════════════
+function openModal(id) { document.getElementById(id)?.classList.add('open'); }
+function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+
+// ═══════════════════════════════
+// SEGURANÇA
+// ═══════════════════════════════
+const BLOCKED = [/\b(crack|cocaína|heroína|meth|bomb|arma)\b/i, /\b(como matar|assassinar|bomba caseira)\b/i, /\b(nazismo|supremacia racial)\b/i];
+function isSafe(t) { return t && t.length >= 1 && t.length <= 3000 && !BLOCKED.some(r => r.test(t)); }
+
+// ═══════════════════════════════
+// UTILS
+// ═══════════════════════════════
+function setStatus(state, txt) {
+  const dot = document.getElementById('status-dot');
+  dot.className = 'dot' + (state === 'on' ? ' on' : state === 'err' ? ' err' : state === 'warn' ? ' warn' : '');
+  document.getElementById('status-txt').textContent = txt;
+}
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+function tlog(msg, type) {
+  const el = document.getElementById('train-log'); if (!el) return;
+  const t = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const cls = {ok:'lc',w:'lw',e:'le',i:'li'}[type]||'li';
+  el.innerHTML += `<div><span style="color:#333">${t}</span> <span class="${cls}">${esc(msg)}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+}
+function splashProg(msg, pct) {
+  document.getElementById('splash-msg').textContent = msg;
+  document.getElementById('splash-bar').style.width = pct + '%';
+}
+function esc(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function removeEl(id) { document.getElementById(id)?.remove(); }
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function tick() { return new Promise(r => setTimeout(r, 0)); }
+</script>
+</body>
+</html>
