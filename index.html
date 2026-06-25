@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>NeuronIA — IA Colaborativa PT-BR</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --void:#080a0f;--deep:#0e1117;--surface:#141720;--panel:#1a1f2e;
+  --border:#242938;--border2:#2e3548;
+  --pulse:#00e5ff;--pulse2:#7c3aed;--pulse3:#06d6a0;
+  --warn:#f59e0b;--danger:#ef4444;
+  --text:#dde1f0;--muted:#5a6080;--muted2:#8890b0;
+  --font:'Space Grotesk',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+html,body{height:100%;background:var(--void);color:var(--text);font-family:var(--font);overflow:hidden}
+#neural-bg{position:fixed;inset:0;z-index:0;opacity:.15;pointer-events:none}
+#app{position:relative;z-index:1;display:flex;height:100vh;overflow:hidden}
+
+/* SIDEBAR */
+#sidebar{width:220px;flex-shrink:0;background:var(--deep);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sidebar-logo{padding:18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.logo-mark{width:36px;height:36px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,var(--pulse2),var(--pulse));display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 20px #7c3aed44}
+.logo-name{font-size:.95rem;font-weight:700;letter-spacing:-.5px}
+.logo-ver{font-size:.62rem;color:var(--muted);font-family:var(--mono)}
+nav{flex:1;padding:10px 0;display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 18px;cursor:pointer;transition:all .15s;border-left:3px solid transparent;font-size:.85rem;font-weight:500;color:var(--muted2);user-select:none}
+.nav-item:hover{background:var(--surface);color:var(--text)}
+.nav-item.active{background:var(--surface);color:var(--pulse);border-left-color:var(--pulse)}
+.nav-icon{font-size:15px;width:20px;text-align:center}
+.nav-badge{margin-left:auto;background:var(--pulse2);color:#fff;font-size:.6rem;padding:2px 6px;border-radius:10px;font-family:var(--mono)}
+.sidebar-stats{padding:12px 18px;border-top:1px solid var(--border)}
+.stat-row{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;margin-bottom:5px}
+.stat-label{color:var(--muted)}
+.stat-val{color:var(--pulse);font-family:var(--mono);font-weight:500}
+.sec-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:600;padding:4px 0 8px}
+
+/* MAIN */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#topbar{height:52px;border-bottom:1px solid var(--border);background:var(--deep);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+#page-title{font-size:.95rem;font-weight:600;flex:1}
+.status-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);font-size:.72rem;background:var(--surface);color:var(--muted2)}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+.pulse-dot.on{background:var(--pulse3);box-shadow:0 0 8px var(--pulse3);animation:pulsate 2s infinite}
+.pulse-dot.warn{background:var(--warn)}
+.pulse-dot.err{background:var(--danger)}
+@keyframes pulsate{0%,100%{opacity:1}50%{opacity:.4}}
+.sec-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;font-size:.68rem;background:#06d6a011;border:1px solid #06d6a033;color:var(--pulse3)}
+
+/* PAGES */
+.page{display:none;flex:1;overflow:hidden;flex-direction:column}
+.page.active{display:flex}
+
+/* CHAT */
+#chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
+#chat-messages::-webkit-scrollbar{width:3px}
+#chat-messages::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.msg{display:flex;gap:10px;animation:msgIn .2s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.msg.user{flex-direction:row-reverse}
+.msg-avatar{width:32px;height:32px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px}
+.msg.ai .msg-avatar{background:linear-gradient(135deg,var(--pulse2),var(--pulse))}
+.msg.user .msg-avatar{background:var(--panel);border:1px solid var(--border2)}
+.msg-body{max-width:75%}
+.msg-bubble{padding:10px 14px;border-radius:14px;font-size:.875rem;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.msg.ai .msg-bubble{background:var(--panel);border:1px solid var(--border);border-top-left-radius:3px}
+.msg.user .msg-bubble{background:#7c3aed22;border:1px solid #7c3aed44;border-top-right-radius:3px}
+.msg-meta{font-size:.62rem;color:var(--muted);margin-top:4px;display:flex;gap:8px;align-items:center}
+.msg.user .msg-meta{justify-content:flex-end}
+.typing-bubble{background:var(--panel);border:1px solid var(--border);border-radius:14px;border-top-left-radius:3px;padding:12px 16px;display:flex;gap:5px;align-items:center}
+.td{width:7px;height:7px;border-radius:50%;background:var(--pulse);animation:td 1.2s infinite}
+.td:nth-child(2){animation-delay:.2s}.td:nth-child(3){animation-delay:.4s}
+@keyframes td{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+#chat-input-wrap{padding:14px 20px 16px;border-top:1px solid var(--border);background:var(--deep);display:flex;flex-direction:column;gap:8px}
+.chat-toolbar{display:flex;gap:6px;align-items:center}
+.chat-mode-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--surface);color:var(--muted2);font-size:.7rem;cursor:pointer;font-family:var(--font);transition:all .15s}
+.chat-mode-btn.active{border-color:var(--pulse2);color:var(--pulse2);background:#7c3aed11}
+.chat-row{display:flex;gap:10px;align-items:flex-end}
+#chat-input{flex:1;background:var(--panel);border:1px solid var(--border2);color:var(--text);border-radius:12px;padding:10px 14px;font-family:var(--font);font-size:.875rem;resize:none;min-height:42px;max-height:120px;line-height:1.5;outline:none;transition:border-color .15s}
+#chat-input:focus{border-color:var(--pulse)}
+#chat-input::placeholder{color:var(--muted)}
+#send-btn{width:42px;height:42px;border-radius:11px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--pulse2),var(--pulse));color:#fff;font-size:16px;transition:opacity .15s;flex-shrink:0}
+#send-btn:disabled{opacity:.3;cursor:not-allowed}
+
+/* CARDS GENÉRICOS */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:12px}
+.card h3{font-size:.95rem;font-weight:600;margin-bottom:6px}
+.card p{font-size:.8rem;color:var(--muted2);line-height:1.5}
+.page-scroll{padding:20px;overflow-y:auto;flex:1;display:flex;flex-direction:column}
+
+/* RLHF */
+.rlhf-q-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.rlhf-q-text{font-size:.9rem;line-height:1.5;color:var(--text)}
+.rlhf-options{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.rlhf-opt{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .15s;font-size:.84rem;line-height:1.5;display:flex;gap:10px;align-items:flex-start}
+.rlhf-opt:hover{border-color:var(--pulse);background:#00e5ff08}
+.rlhf-opt.selected{border-color:var(--pulse3);background:#06d6a011}
+.rlhf-opt-num{width:22px;height:22px;border-radius:6px;background:var(--panel);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-family:var(--mono);flex-shrink:0;color:var(--muted2)}
+.rlhf-opt.selected .rlhf-opt-num{background:var(--pulse3);border-color:var(--pulse3);color:#000}
+.rlhf-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+/* BOTÕES */
+.btn{padding:9px 16px;border-radius:9px;border:none;cursor:pointer;font-family:var(--font);font-size:.8rem;font-weight:600;transition:all .15s}
+.btn-primary{background:linear-gradient(135deg,var(--pulse2),var(--pulse));color:#fff}
+.btn-primary:hover{opacity:.85}
+.btn-primary:disabled{opacity:.3;cursor:not-allowed}
+.btn-ghost{background:var(--panel);border:1px solid var(--border2);color:var(--text)}
+.btn-ghost:hover{border-color:var(--pulse2);color:var(--pulse2)}
+.btn-danger{background:#ef444422;border:1px solid #ef444444;color:var(--danger)}
+.btn-warn{background:#f59e0b22;border:1px solid #f59e0b44;color:var(--warn)}
+.correction-box{display:none;margin-top:10px}
+.correction-input{width:100%;background:var(--surface);border:1px solid var(--border2);color:var(--text);border-radius:9px;padding:10px 14px;font-family:var(--font);font-size:.84rem;resize:vertical;min-height:70px;outline:none}
+.correction-input:focus{border-color:var(--pulse3)}
+
+/* METER / LOG */
+.meter-wrap{background:var(--surface);border-radius:8px;height:8px;overflow:hidden;margin:8px 0}
+.meter-bar{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--pulse2),var(--pulse));transition:width .4s}
+.train-log{background:var(--void);border:1px solid var(--border);border-radius:10px;padding:10px;font-family:var(--mono);font-size:.72rem;color:var(--muted2);max-height:150px;overflow-y:auto;line-height:1.8;margin-top:10px}
+.log-line{display:flex;gap:8px}
+.log-time{color:var(--muted);flex-shrink:0}
+.log-ok{color:var(--pulse3)}.log-warn{color:var(--warn)}.log-err{color:var(--danger)}.log-info{color:var(--pulse)}
+.epoch-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.epoch-cell{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center}
+.e-label{font-size:.65rem;color:var(--muted);margin-bottom:2px}
+.e-val{font-size:.85rem;font-family:var(--mono);font-weight:500;color:var(--pulse)}
+
+/* VOCAB */
+.vocab-search-wrap{display:flex;gap:8px}
+#vocab-search{flex:1;background:var(--panel);border:1px solid var(--border2);color:var(--text);border-radius:10px;padding:9px 14px;font-family:var(--font);font-size:.85rem;outline:none}
+#vocab-search:focus{border-color:var(--pulse)}
+.word-result{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:8px}
+.word-result .word{font-size:1.3rem;font-weight:700;letter-spacing:-.5px}
+.word-result .word-meta{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.tag{padding:3px 9px;border-radius:6px;font-size:.7rem;font-weight:500;background:var(--surface);border:1px solid var(--border2);color:var(--muted2)}
+.tag.valid{border-color:#06d6a044;color:var(--pulse3);background:#06d6a011}
+.tag.invalid{border-color:#ef444444;color:var(--danger);background:#ef444411}
+.tag.cat{border-color:#7c3aed44;color:var(--pulse2);background:#7c3aed11}
+.word-freq{margin-top:8px;font-size:.8rem;color:var(--muted2)}
+.vocab-cloud{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0}
+.vocab-chip{padding:5px 11px;border-radius:20px;font-size:.78rem;cursor:pointer;border:1px solid var(--border);background:var(--panel);color:var(--muted2);transition:all .15s}
+.vocab-chip:hover{border-color:var(--pulse);color:var(--pulse)}
+.vocab-chip.freq-high{border-color:#7c3aed44;color:var(--pulse2);font-size:.85rem}
+.vocab-chip.freq-med{color:var(--text)}
+
+/* SOURCE CARDS */
+.source-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
+.source-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.source-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.source-icon.leipzig{background:#7c3aed22;border:1px solid #7c3aed44}
+.source-icon.wiki{background:#00e5ff22;border:1px solid #00e5ff44}
+.source-icon.subs{background:#06d6a022;border:1px solid #06d6a044}
+.source-icon.quotes{background:#f59e0b22;border:1px solid #f59e0b44}
+.source-name{font-weight:600;font-size:.9rem}
+.source-desc{font-size:.75rem;color:var(--muted2)}
+.source-stats{display:flex;gap:14px;font-size:.75rem;color:var(--muted2);margin-bottom:8px}
+.source-stats span{color:var(--text);font-family:var(--mono)}
+
+/* MODAL TERMOS */
+#terms-overlay{position:fixed;inset:0;z-index:1000;background:#000000cc;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px}
+#terms-modal{background:var(--deep);border:1px solid var(--border2);border-radius:20px;width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden}
+.terms-head{padding:22px 24px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.terms-head-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--pulse2),var(--pulse));display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.terms-head h2{font-size:1.05rem;font-weight:700}
+.terms-head p{font-size:.75rem;color:var(--muted2)}
+.terms-body{flex:1;overflow-y:auto;padding:18px 24px}
+.terms-body::-webkit-scrollbar{width:3px}
+.terms-body::-webkit-scrollbar-thumb{background:var(--border2)}
+.terms-section{margin-bottom:16px}
+.terms-section h3{font-size:.8rem;font-weight:600;color:var(--pulse2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.terms-section p,.terms-section li{font-size:.8rem;color:var(--muted2);line-height:1.65;margin-bottom:3px}
+.terms-section ul{padding-left:16px}
+.terms-foot{padding:14px 24px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
+.terms-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:.82rem;color:var(--muted2);line-height:1.4}
+.terms-check input[type="checkbox"]{width:16px;height:16px;margin-top:1px;accent-color:var(--pulse2);flex-shrink:0;cursor:pointer}
+#accept-btn{width:100%;padding:12px;border-radius:11px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--pulse2),var(--pulse));color:#fff;font-family:var(--font);font-weight:700;font-size:.9rem;transition:opacity .2s}
+#accept-btn:disabled{opacity:.35;cursor:not-allowed}
+#accept-btn:not(:disabled):hover{opacity:.88}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--border2);color:var(--text);padding:9px 18px;border-radius:10px;font-size:.82rem;z-index:500;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1}
+
+/* EMPTY */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px 20px;text-align:center;color:var(--muted)}
+.empty-icon{font-size:36px;opacity:.5}
+.empty p{font-size:.85rem;line-height:1.5;max-width:320px}
+
+/* QUIZ / STATS EXTRAS */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center}
+.stat-card .big{font-size:1.6rem;font-weight:700;font-family:var(--mono);color:var(--pulse);line-height:1}
+.stat-card .label{font-size:.72rem;color:var(--muted);margin-top:4px}
+.confidence-bar{display:flex;align-items:center;gap:8px;font-size:.72rem;color:var(--muted2);margin-top:6px}
+.conf-fill{height:5px;border-radius:3px;background:linear-gradient(90deg,var(--pulse2),var(--pulse3));flex:1}
+
+@media(max-width:640px){#sidebar{display:none}.msg-body{max-width:90%}}
+</style>
+</head>
+<body>
+<canvas id="neural-bg"></canvas>
+
+<!-- TERMOS DE USO -->
+<div id="terms-overlay">
+  <div id="terms-modal">
+    <div class="terms-head">
+      <div class="terms-head-icon">🧠</div>
+      <div>
+        <h2>NeuronIA — Termos de Uso</h2>
+        <p>Leia antes de começar · Versão 2.0</p>
+      </div>
+    </div>
+    <div class="terms-body">
+      <div class="terms-section">
+        <h3>🔒 Privacidade e Segurança</h3>
+        <ul>
+          <li>Você <strong>nunca</strong> precisa criar conta ou fornecer e-mail.</li>
+          <li>Identificamos seu dispositivo por um código anônimo gerado localmente.</li>
+          <li>Esse código <strong>não pode</strong> identificar você pessoalmente.</li>
+          <li>Nenhum dado pessoal é coletado, armazenado ou compartilhado.</li>
+          <li>Todo processamento da IA ocorre no seu próprio navegador.</li>
+        </ul>
+      </div>
+      <div class="terms-section">
+        <h3>🧠 Treinamento Colaborativo</h3>
+        <ul>
+          <li>Ao treinar a IA, você contribui com pares de pergunta e resposta.</li>
+          <li>Essas contribuições ficam salvas no banco de dados compartilhado.</li>
+          <li>Outros usuários se beneficiam do seu treinamento (e vice-versa).</li>
+          <li>Ao doe poder computacional, seu dispositivo processa cálculos localmente.</li>
+        </ul>
+      </div>
+      <div class="terms-section">
+        <h3>⚠️ Limitações</h3>
+        <ul>
+          <li>Esta é uma IA experimental criada do zero para fins educativos.</li>
+          <li>As respostas podem ser imprecisas, incompletas ou incorretas.</li>
+          <li>Não use para decisões médicas, jurídicas ou financeiras.</li>
+        </ul>
+      </div>
+      <div class="terms-section">
+        <h3>🚫 Uso Proibido</h3>
+        <ul>
+          <li>É proibido treinar a IA com conteúdo ofensivo, falso ou ilegal.</li>
+          <li>Conteúdo inadequado é detectado e bloqueado automaticamente.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="terms-foot">
+      <label class="terms-check">
+        <input type="checkbox" id="terms-check1"/>
+        Entendo que esta é uma IA experimental e aceito suas limitações
+      </label>
+      <label class="terms-check">
+        <input type="checkbox" id="terms-check2"/>
+        Li e aceito os termos de privacidade — nenhum dado pessoal meu é coletado
+      </label>
+      <button id="accept-btn" disabled>Aceitar e Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP PRINCIPAL -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">🧠</div>
+      <div>
+        <div class="logo-name">NeuronIA</div>
+        <div class="logo-ver">v2.1 · PT-BR</div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-item active" onclick="goPage('chat')" id="nav-chat"><span class="nav-icon">💬</span>Conversar</div>
+      <div class="nav-item" onclick="goPage('train')" id="nav-train"><span class="nav-icon">🎓</span>Treinar IA<span class="nav-badge" id="train-badge">0</span></div>
+      <div class="nav-item" onclick="goPage('power')" id="nav-power"><span class="nav-icon">⚡</span>Poder CPU</div>
+      <div class="nav-item" onclick="goPage('vocab')" id="nav-vocab"><span class="nav-icon">🔤</span>Vocabulário</div>
+      <div class="nav-item" onclick="goPage('corpus')" id="nav-corpus"><span class="nav-icon">🌐</span>Fontes</div>
+      <div class="nav-item" onclick="goPage('stats')" id="nav-stats"><span class="nav-icon">📊</span>Estatísticas</div>
+    </nav>
+    <div class="sidebar-stats">
+      <div class="sec-title">Sistema</div>
+      <div class="stat-row"><span class="stat-label">Vocab.</span><span class="stat-val" id="s-vocab">—</span></div>
+      <div class="stat-row"><span class="stat-label">Treinos</span><span class="stat-val" id="s-train">—</span></div>
+      <div class="stat-row"><span class="stat-label">Corpus</span><span class="stat-val" id="s-corpus">—</span></div>
+      <div class="stat-row"><span class="stat-label">Versão IA</span><span class="stat-val" id="s-model">1</span></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+    <div id="topbar">
+      <span id="page-title">Conversar</span>
+      <div class="status-pill">
+        <div class="pulse-dot" id="main-dot"></div>
+        <span id="main-status">Iniciando...</span>
+      </div>
+      <div class="sec-badge">🔒 Seguro</div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="page active" id="page-chat">
+      <div id="chat-messages">
+        <div class="empty" id="chat-empty">
+          <div class="empty-icon">🤖</div>
+          <p>A IA está pronta! Digite algo abaixo para começar a conversar.<br/>Quanto mais você treinar, melhor ela fica.</p>
+        </div>
+      </div>
+      <div id="chat-input-wrap">
+        <div class="chat-toolbar">
+          <span style="font-size:.72rem;color:var(--muted)">Modo:</span>
+          <button class="chat-mode-btn active" id="mode-chat" onclick="setMode('chat')">💬 Chat</button>
+          <button class="chat-mode-btn" id="mode-rlhf" onclick="setMode('rlhf')">🎓 Comparar</button>
+          <button class="chat-mode-btn" id="mode-quiz" onclick="setMode('quiz')">❓ Quiz</button>
+          <span id="typing-hint" style="font-size:.7rem;color:var(--muted);margin-left:auto">Enter para enviar · Shift+Enter nova linha</span>
+        </div>
+        <div class="chat-row">
+          <textarea id="chat-input" placeholder="Digite sua mensagem..." rows="1"></textarea>
+          <button id="send-btn">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRAIN RLHF -->
+    <div class="page" id="page-train">
+      <div class="page-scroll">
+        <div class="card">
+          <h3>🎓 Treinar a IA — Escolha a Melhor Resposta</h3>
+          <p>A IA gera 3 opções para cada pergunta. Você escolhe a melhor. Isso ensina a IA quais respostas são boas — exatamente como grandes modelos de linguagem são treinados (RLHF).</p>
+        </div>
+        <div id="rlhf-section">
+          <div class="empty"><div class="empty-icon">⏳</div><p>Carregando perguntas...</p></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn btn-ghost" onclick="loadRLHF()">🔄 Carregar mais</button>
+          <button class="btn btn-ghost" onclick="goPage('chat')">💬 Adicionar pergunta</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- POWER -->
+    <div class="page" id="page-power">
+      <div class="page-scroll">
+        <div class="card">
+          <h3>⚡ Doe Poder Computacional</h3>
+          <p>Seu navegador usa o processador do dispositivo para treinar os neurônios da IA com dados já aprovados. O treinamento roda localmente e salva os pesos no banco compartilhado.</p>
+          <div class="epoch-grid">
+            <div class="epoch-cell"><div class="e-label">Época</div><div class="e-val" id="ep-cur">—</div></div>
+            <div class="epoch-cell"><div class="e-label">Perda</div><div class="e-val" id="ep-loss">—</div></div>
+            <div class="epoch-cell"><div class="e-label">Acurácia</div><div class="e-val" id="ep-acc">—</div></div>
+            <div class="epoch-cell"><div class="e-label">Tempo</div><div class="e-val" id="ep-time">—</div></div>
+          </div>
+          <div class="meter-wrap"><div class="meter-bar" id="train-meter" style="width:0%"></div></div>
+          <div class="train-log" id="train-log"><div class="log-line"><span class="log-time">--:--</span><span class="log-info">Pronto para treinar</span></div></div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-primary" id="start-train-btn" onclick="startTraining()">▶ Iniciar Treino</button>
+            <button class="btn btn-ghost" id="stop-train-btn" onclick="stopTraining()" disabled>⏹ Parar</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>📋 Sessões Recentes</h3>
+          <div id="contrib-list" class="train-log" style="max-height:120px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VOCAB -->
+    <div class="page" id="page-vocab">
+      <div class="page-scroll">
+        <div class="card">
+          <h3>🔤 Verificador de Palavras</h3>
+          <div class="vocab-search-wrap" style="margin-top:10px">
+            <input id="vocab-search" placeholder="Digite uma palavra..."/>
+            <button class="btn btn-ghost" onclick="searchVocab(document.getElementById('vocab-search').value)">Buscar</button>
+          </div>
+          <div id="vocab-result"></div>
+        </div>
+        <div class="card">
+          <div class="sec-title">Palavras mais frequentes</div>
+          <div class="vocab-cloud" id="vocab-cloud"><div class="empty"><p>Carregando...</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CORPUS -->
+    <div class="page" id="page-corpus">
+      <div class="page-scroll">
+        <div class="source-card">
+          <div class="source-header">
+            <div class="source-icon leipzig">📚</div>
+            <div><div class="source-name">Wikipedia PT (Aleatório)</div><div class="source-desc">Artigos enciclopédicos reais em português</div></div>
+          </div>
+          <div class="source-stats">Baixados: <span id="lz-count">0</span> &nbsp; Processados: <span id="lz-proc">0</span></div>
+          <div class="meter-wrap"><div class="meter-bar" id="lz-bar" style="width:0%"></div></div>
+          <button class="btn btn-ghost" onclick="fetchLeipzig()">⬇ Buscar frases</button>
+        </div>
+        <div class="source-card">
+          <div class="source-header">
+            <div class="source-icon wiki">🌍</div>
+            <div><div class="source-name">Wikipedia PT (Por Tema)</div><div class="source-desc">Conhecimento por categoria: ciência, história, arte...</div></div>
+          </div>
+          <div class="source-stats">Artigos: <span id="wp-count">0</span> &nbsp; Processados: <span id="wp-proc">0</span></div>
+          <div class="meter-wrap"><div class="meter-bar" id="wp-bar" style="width:0%"></div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="wiki-topics">
+            <button class="chat-mode-btn" onclick="fetchWikipedia('inteligência_artificial')">IA</button>
+            <button class="chat-mode-btn" onclick="fetchWikipedia('ciência')">Ciência</button>
+            <button class="chat-mode-btn" onclick="fetchWikipedia('história_do_brasil')">História BR</button>
+            <button class="chat-mode-btn" onclick="fetchWikipedia('matemática')">Matemática</button>
+            <button class="chat-mode-btn" onclick="fetchWikipedia('esporte')">Esporte</button>
+            <button class="chat-mode-btn" onclick="fetchWikipedia('música')">Música</button>
+          </div>
+          <button class="btn btn-ghost" onclick="fetchWikipedia()">⬇ Artigo aleatório</button>
+        </div>
+        <div class="source-card">
+          <div class="source-header">
+            <div class="source-icon subs">🗣️</div>
+            <div><div class="source-name">Diálogos Informais</div><div class="source-desc">Conversas do cotidiano para linguagem natural</div></div>
+          </div>
+          <div class="source-stats">Frases: <span id="os-count">0</span> &nbsp; Processados: <span id="os-proc">0</span></div>
+          <div class="meter-wrap"><div class="meter-bar" id="os-bar" style="width:0%"></div></div>
+          <button class="btn btn-ghost" onclick="fetchSubtitles()">⬇ Carregar diálogos</button>
+        </div>
+        <div class="source-card">
+          <div class="source-header">
+            <div class="source-icon quotes">💡</div>
+            <div><div class="source-name">API de Citações (Wikidata)</div><div class="source-desc">Frases e citações de domínio público em PT</div></div>
+          </div>
+          <div class="source-stats">Citações: <span id="qt-count">0</span></div>
+          <div class="meter-wrap"><div class="meter-bar" id="qt-bar" style="width:0%"></div></div>
+          <button class="btn btn-ghost" onclick="fetchQuotes()">⬇ Buscar citações</button>
+        </div>
+        <div class="card">
+          <div class="sec-title">Processar corpus → vocabulário</div>
+          <p style="font-size:.8rem;color:var(--muted2);margin-bottom:10px">Extrai palavras do corpus não processado e adiciona ao vocabulário da IA.</p>
+          <button class="btn btn-primary" onclick="processCorpus()">⚙️ Processar tudo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="page" id="page-stats">
+      <div class="page-scroll">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="big" id="st-total-msgs">—</div><div class="label">Mensagens trocadas</div></div>
+          <div class="stat-card"><div class="big" id="st-train-sess">—</div><div class="label">Sessões de treino</div></div>
+          <div class="stat-card"><div class="big" id="st-vocab">—</div><div class="label">Palavras no vocab.</div></div>
+          <div class="stat-card"><div class="big" id="st-corpus">—</div><div class="label">Frases no corpus</div></div>
+        </div>
+        <div class="card">
+          <h3>🧠 Saúde do Modelo</h3>
+          <div id="model-health" style="margin-top:10px;font-size:.85rem;color:var(--muted2);line-height:2">Carregando...</div>
+        </div>
+        <div class="card">
+          <h3>🏆 Histórico de Treinos</h3>
+          <div id="train-history" class="train-log" style="max-height:200px"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ══════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════
+const SB_URL = 'https://mphcruhuzrxugioqidi.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1waGNydWh1enJ4dWdpb2pxaWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDc2MzgsImV4cCI6MjA5Nzk4MzYzOH0.eJK7JRPqbUSYQVBkT4N6a4LSadAUGiBX7uEJFVMa1h0';
+
+// ══════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════════════════
+let db = null, userId = null, model = null;
+let vocab = {}, vocabArr = [], vocabSize = 0;
+let isTraining = false, stopFlag = false, trainStart = 0;
+let chatMode = 'chat'; // 'chat' | 'rlhf' | 'quiz'
+let sessionMsgs = 0;
+let quizState = null;
+
+// ══════════════════════════════════════════════════
+// BOOT — corrigido: termos via event listener, não onchange inline
+// ══════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  drawNeuralBg();
+
+  // FIX: usar addEventListener em vez de onchange inline nos checkboxes
+  const c1 = document.getElementById('terms-check1');
+  const c2 = document.getElementById('terms-check2');
+  const btn = document.getElementById('accept-btn');
+
+  function updateAcceptBtn() {
+    btn.disabled = !(c1.checked && c2.checked);
+  }
+  c1.addEventListener('change', updateAcceptBtn);
+  c2.addEventListener('change', updateAcceptBtn);
+  btn.addEventListener('click', acceptTerms);
+
+  const accepted = localStorage.getItem('terms_v2');
+  if (accepted) {
+    document.getElementById('terms-overlay').style.display = 'none';
+    init();
+  }
+});
+
+async function init() {
+  userId = getOrCreateUserId();
+  db = window.supabase.createClient(SB_URL, SB_KEY);
+  setStatus('warn', 'Conectando...');
+  try {
+    await loadVocab();
+    await buildModel();
+    await loadModelWeights();
+    await Promise.all([loadStats(), loadVocabCloud(), loadContribs(), loadCorpusStats()]);
+    await loadRLHF();
+    setStatus('on', 'Pronto');
+    log('Sistema v2.1 iniciado', 'ok');
+    setTimeout(autoFetchCorpus, 5000);
+    setupChatInput();
+  } catch(e) {
+    setStatus('err', 'Erro de conexão');
+    log('Erro: ' + e.message, 'err');
+    console.error(e);
+  }
+}
+
+async function acceptTerms() {
+  localStorage.setItem('terms_v2', new Date().toISOString());
+  document.getElementById('terms-overlay').style.display = 'none';
+  await init();
+}
+
+// ══════════════════════════════════════════════════
+// IDENTIDADE ANÔNIMA
+// ══════════════════════════════════════════════════
+function getOrCreateUserId() {
+  let id = localStorage.getItem('neuron_uid');
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() :
+      'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, c => {
+        const r = Math.random()*16|0;
+        return (c==='x'?r:(r&0x3|0x8)).toString(16);
+      }));
+    localStorage.setItem('neuron_uid', id);
+  }
+  return id;
+}
+
+// ══════════════════════════════════════════════════
+// SEGURANÇA
+// ══════════════════════════════════════════════════
+const BLOCKED = [
+  /\b(crack|cocaína|heroína|metanfetamina)\b/i,
+  /\b(como matar|assassinar|bomba caseira|explodir)\b/i,
+  /\b(pornô explícito|conteúdo sexual)\b/i,
+  /\b(nazismo|fascismo racial|supremacia)\b/i,
+];
+function isSafe(t) {
+  if (!t || t.trim().length < 1 || t.length > 2000) return false;
+  return !BLOCKED.some(r => r.test(t));
+}
+function sanitize(t) {
+  return String(t).replace(/[<>]/g,'').replace(/javascript:/gi,'').trim().slice(0, 2000);
+}
+
+// ══════════════════════════════════════════════════
+// VOCABULÁRIO
+// ══════════════════════════════════════════════════
+async function loadVocab() {
+  const { data } = await db.from('vocabulario')
+    .select('palavra').eq('valida', true)
+    .order('frequencia', { ascending: false }).limit(8000);
+  vocab = { '<PAD>':0, '<UNK>':1, '<START>':2, '<END>':3 };
+  vocabArr = ['<PAD>','<UNK>','<START>','<END>'];
+  (data||[]).forEach(r => {
+    if (!vocab[r.palavra]) { vocab[r.palavra] = vocabArr.length; vocabArr.push(r.palavra); }
+  });
+  vocabSize = vocabArr.length;
+  document.getElementById('s-vocab').textContent = vocabSize;
+}
+
+function tokenize(text) {
+  return text.toLowerCase()
+    .replace(/[^\wÀ-ÿ\s]/g,' ').split(/\s+/).filter(Boolean)
+    .map(w => vocab[w] !== undefined ? vocab[w] : 1);
+}
+function detokenize(ids) {
+  return ids.filter(i=>i>3).map(i=>vocabArr[i]||'').join(' ')
+    .replace(/ ([,.!?])/g,'$1').trim();
+}
+
+// ══════════════════════════════════════════════════
+// REDE NEURAL — arquitetura melhorada
+// ══════════════════════════════════════════════════
+async function buildModel() {
+  const vSize = Math.max(vocabSize, 100);
+  model = tf.sequential();
+  model.add(tf.layers.embedding({ inputDim: vSize, outputDim: 128, maskZero: true, name: 'emb' }));
+  model.add(tf.layers.lstm({ units: 256, returnSequences: true, dropout: 0.15, recurrentDropout: 0.1, name: 'lstm1' }));
+  model.add(tf.layers.lstm({ units: 128, returnSequences: false, dropout: 0.1, name: 'lstm2' }));
+  model.add(tf.layers.dropout({ rate: 0.25, name: 'drop' }));
+  model.add(tf.layers.dense({ units: 128, activation: 'relu', name: 'dense1' }));
+  model.add(tf.layers.dense({ units: vSize, activation: 'softmax', name: 'out' }));
+  model.compile({ optimizer: tf.train.adam(0.0008), loss: 'sparseCategoricalCrossentropy', metrics: ['accuracy'] });
+  log('Rede: Emb(128)→LSTM(256)→LSTM(128)→Dense(128)→Softmax', 'ok');
+}
+
+// ══════════════════════════════════════════════════
+// PESOS — Supabase
+// ══════════════════════════════════════════════════
+async function saveModelWeights() {
+  if (!model) return;
+  try {
+    const weights = model.getWeights().map(w => Array.from(w.dataSync()));
+    const { data } = await db.from('modelo').select('versao').eq('nome','config').single();
+    const v = (data?.versao || 1) + 1;
+    await db.from('modelo').update({
+      dados: JSON.stringify({ pesos: weights, vocab_size: vocabSize, versao: v, atualizado: new Date().toISOString() })
+    }).eq('nome','config');
+    document.getElementById('s-model').textContent = v;
+    log(`Pesos salvos — versão ${v}`, 'ok');
+  } catch(e) { log('Erro ao salvar pesos: '+e.message,'err'); }
+}
+
+async function loadModelWeights() {
+  try {
+    const { data } = await db.from('modelo').select('dados,versao').eq('nome','config').single();
+    if (!data?.dados) return;
+    const d = typeof data.dados === 'string' ? JSON.parse(data.dados) : data.dados;
+    if (d.pesos?.length && model) {
+      const shapes = model.getWeights().map(w => w.shape);
+      // Só carrega se tamanho compatível
+      if (d.pesos.length === shapes.length) {
+        const tensors = d.pesos.map((arr,i) => tf.tensor(arr, shapes[i]));
+        model.setWeights(tensors);
+        tensors.forEach(t => t.dispose());
+        document.getElementById('s-model').textContent = data.versao || 1;
+        log('Pesos carregados do banco (v'+data.versao+')', 'ok');
+      } else {
+        log('Arquitetura mudou — iniciando pesos do zero', 'warn');
+      }
+    }
+  } catch(e) { log('Sem pesos salvos ainda — treine para começar!', 'warn'); }
+}
+
+// ══════════════════════════════════════════════════
+// GERAÇÃO — IA melhorada com busca semântica + modelo
+// ══════════════════════════════════════════════════
+async function generateResponse(input, temperature = 0.7) {
+  // 1. Busca por correspondência semântica no banco (prioridade máxima)
+  const exact = await findBestMatch(input);
+  if (exact && exact.score > 0.75) {
+    // Adiciona leve variação para não ser robótico
+    return paraphrase(exact.resposta, temperature);
+  }
+  // 2. Tenta modelo neural
+  if (model && vocabSize >= 20) {
+    try {
+      const out = await generateWithModel(input, temperature);
+      if (out && out.length > 3) return out;
+    } catch(e) {}
+  }
+  // 3. Fallback inteligente com busca parcial
+  const partial = await findBestMatch(input, 0.3);
+  if (partial && partial.score > 0.3) return partial.resposta;
+  return fallbackResponse(input);
+}
+
+// Gera variação leve de uma resposta conhecida
+function paraphrase(text, temp) {
+  if (temp < 0.5) return text;
+  const prefixes = ['', 'Claro! ', 'Boa pergunta! ', 'Interessante! '];
+  const prefix = Math.random() < 0.3 ? prefixes[Math.floor(Math.random()*prefixes.length)] : '';
+  return prefix + text;
+}
+
+async function generate3Responses(input) {
+  const [r1, r2, r3] = await Promise.all([
+    generateResponse(input, 0.4),
+    generateResponse(input, 0.8),
+    generateResponse(input, 1.3),
+  ]);
+  const all = [r1, r2, r3];
+  const unique = [];
+  for (const r of all) {
+    if (!unique.some(u => similarity(u, r) > 0.85)) unique.push(r);
+  }
+  while (unique.length < 3) unique.push(fallbackResponse(input));
+  return unique.slice(0, 3);
+}
+
+async function generateWithModel(input, temperature) {
+  const SEQ = 24;
+  const tokens = [2, ...tokenize(input)].slice(-SEQ);
+  while (tokens.length < SEQ) tokens.unshift(0);
+  const out = [];
+  let cur = [...tokens];
+  for (let i = 0; i < 40; i++) {
+    const inp = tf.tensor2d([cur],[1,SEQ]);
+    const pred = model.predict(inp);
+    const logits = await pred.data();
+    inp.dispose(); pred.dispose();
+    const scaled = applyTemperature(Array.from(logits), temperature);
+    const next = sampleFromDistribution(scaled);
+    if (next === 3 || next === 0) break;
+    out.push(next);
+    cur.shift(); cur.push(next);
+  }
+  return detokenize(out);
+}
+
+function applyTemperature(logits, temp) {
+  const max = Math.max(...logits);
+  const exp = logits.map(l => Math.exp((l-max)/Math.max(temp,0.1)));
+  const sum = exp.reduce((a,b)=>a+b,0);
+  return exp.map(e=>e/sum);
+}
+function sampleFromDistribution(probs) {
+  let r = Math.random();
+  for (let i=0;i<probs.length;i++) { r -= probs[i]; if (r<=0) return i; }
+  return probs.length-1;
+}
+
+// Busca semântica por bigramas de caracteres
+async function findBestMatch(input, threshold = 0.5) {
+  try {
+    const { data } = await db.from('treinamento')
+      .select('pergunta,resposta,pontuacao').eq('aprovado',true)
+      .order('pontuacao',{ascending:false}).limit(500);
+    if (!data?.length) return null;
+    const norm = input.toLowerCase().trim();
+    let best = null, bestScore = 0;
+    for (const row of data) {
+      const score = similarity(norm, row.pergunta.toLowerCase());
+      if (score > bestScore) { bestScore = score; best = { resposta: row.resposta, score }; }
+    }
+    return bestScore >= threshold ? best : null;
+  } catch(e) { return null; }
+}
+
+// Similaridade por bigramas (rápido, sem servidor)
+function similarity(a, b) {
+  if (a === b) return 1;
+  if (!a.length || !b.length) return 0;
+  const bg = s => { const set = new Set(); for (let i=0;i<s.length-1;i++) set.add(s.slice(i,i+2)); return set; };
+  const ba = bg(a), bb = bg(b);
+  let inter = 0; ba.forEach(v => { if (bb.has(v)) inter++; });
+  return (2*inter)/(ba.size+bb.size);
+}
+
+// Fallback estruturado por palavras-chave
+function fallbackResponse(input) {
+  const l = input.toLowerCase();
+  const rules = [
+    [['olá','oi','ei','hey','salve'], ['Olá! Como posso ajudar?', 'Oi! Boa conversa!', 'Ei, tudo bem? Me conta o que precisa!']],
+    [['bom dia'], ['Bom dia! Que ótimo começar o dia conversando!', 'Bom dia! Em que posso ajudar hoje?']],
+    [['boa tarde'], ['Boa tarde! Como vai?', 'Boa tarde! Em que posso ajudar?']],
+    [['boa noite'], ['Boa noite! Descanse bem depois!', 'Boa noite! Posso ajudar com algo?']],
+    [['obrigad','valeu','thanks'], ['De nada! Fico feliz em ajudar.', 'Com prazer!', 'Disponha!']],
+    [['tchau','até logo','xau'], ['Até logo!', 'Tchau! Volte sempre.', 'Até mais!']],
+    [['quem é você','o que você é','seu nome'], ['Sou o NeuronIA, uma IA feita do zero e treinada colaborativamente por usuários como você!']],
+    [['como você funciona','como aprende'], ['Aprendo com os dados que você e outros usuários me ensinam! Quanto mais vocês me treinarem, melhor eu fico.']],
+    [['tudo bem','como vai','tá bom'], ['Estou funcionando bem! E você?', 'Tudo certo por aqui. Me conta!']],
+    [['ajuda','help','socorro'], ['Claro! Me diga o que precisa e farei o melhor que puder.']],
+    [['não sei','dúvida'], ['Tudo bem não saber! Podemos pesquisar juntos. Pergunte o que quiser.']],
+    [['legal','incrível','top','show'], ['Que ótimo! Fico feliz em saber disso.', 'Que legal! Pode me contar mais?']],
+    [['brasil','brasileiro'], ['O Brasil é um país incrível! Tem muito o que aprender sobre ele. Sobre o que especificamente quer falar?']],
+    [['inteligência artificial','ia','machine learning'], ['A IA é fascinante! Estou aqui como exemplo disso — uma rede neural treinada colaborativamente.']],
+  ];
+  for (const [keys, resps] of rules) {
+    if (keys.some(k => l.includes(k))) return resps[Math.floor(Math.random()*resps.length)];
+  }
+  const generics = [
+    'Interessante! Ainda estou aprendendo. Me treine na aba "Treinar IA" para eu melhorar!',
+    'Hmm, preciso de mais treinamento para responder isso bem. Você pode me ensinar?',
+    'Boa pergunta! Vou a aba Treinar IA para adicionar a resposta certa.',
+    'Ainda não sei isso muito bem. Quanto mais me treinar, melhores serão minhas respostas!',
+  ];
+  return generics[Math.floor(Math.random()*generics.length)];
+}
+
+// ══════════════════════════════════════════════════
+// CHAT
+// ══════════════════════════════════════════════════
+function setMode(mode) {
+  chatMode = mode;
+  document.querySelectorAll('.chat-mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('mode-'+mode)?.classList.add('active');
+  const placeholder = { chat: 'Digite sua mensagem...', rlhf: 'Pergunta para comparar 3 respostas...', quiz: 'Responda a pergunta acima...' };
+  document.getElementById('chat-input').placeholder = placeholder[mode] || 'Digite...';
+  if (mode === 'quiz') startQuiz();
+}
+
+async function startQuiz() {
+  const { data } = await db.from('treinamento').select('pergunta,resposta').eq('aprovado',true).limit(100);
+  if (!data?.length) { appendMsg('ai','Sem dados de quiz ainda. Adicione mais treinos primeiro!'); return; }
+  quizState = data[Math.floor(Math.random()*data.length)];
+  appendMsg('ai', `❓ **Quiz!** ${quizState.pergunta}\n\nDigite sua resposta:`);
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const raw = input.value;
+  const text = sanitize(raw);
+  if (!text) return;
+  if (!isSafe(text)) { toast('⚠️ Conteúdo não permitido'); return; }
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('chat-empty')?.remove();
+  appendMsg('user', text);
+  sessionMsgs++;
+
+  if (chatMode === 'quiz' && quizState) {
+    // Avalia resposta do quiz
+    const score = similarity(text.toLowerCase(), quizState.resposta.toLowerCase());
+    const correct = score > 0.5;
+    appendMsg('ai', correct
+      ? `✅ Muito bem! A resposta é: "${quizState.resposta}"`
+      : `❌ Quase! A resposta correta seria: "${quizState.resposta}"\n\nSimilaridade: ${Math.round(score*100)}%`
+    );
+    quizState = null;
+    setTimeout(() => { if (chatMode==='quiz') startQuiz(); }, 2000);
+    return;
+  }
+
+  if (chatMode === 'rlhf') {
+    // Modo comparar — mostra 3 respostas para o usuário votar
+    const typId = appendTyping();
+    document.getElementById('send-btn').disabled = true;
+    const resps = await generate3Responses(text);
+    removeTyping(typId);
+    const card = document.createElement('div');
+    card.className = 'msg ai';
+    card.innerHTML = `<div class="msg-avatar">🤖</div>
+      <div class="msg-body" style="max-width:85%">
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px">Qual resposta é melhor?</div>
+        ${resps.map((r,i)=>`<div class="rlhf-opt" onclick="voteInChat(this,${i+1},'${escAtt(text)}',${JSON.stringify(resps).replace(/\\/g,'\\\\').replace(/'/g,"\\'")})">
+          <div class="rlhf-opt-num">${i+1}</div><div>${escHtml(r)}</div></div>`).join('')}
+      </div>`;
+    document.getElementById('chat-messages').appendChild(card);
+    document.getElementById('chat-messages').scrollTop = 999999;
+    document.getElementById('send-btn').disabled = false;
+    return;
+  }
+
+  // Modo chat normal
+  const typId = appendTyping();
+  document.getElementById('send-btn').disabled = true;
+  try {
+    const reply = await generateResponse(text);
+    removeTyping(typId);
+    appendMsg('ai', reply);
+    queueTopicFetch(text);
+  } catch(e) {
+    removeTyping(typId);
+    appendMsg('ai', 'Ops! Tive um problema. Tente novamente.');
+  }
+  document.getElementById('send-btn').disabled = false;
+}
+
+async function voteInChat(el, idx, pergunta, resps) {
+  el.closest('.msg-body').querySelectorAll('.rlhf-opt').forEach(o => {
+    o.style.pointerEvents = 'none';
+    o.style.opacity = '.5';
+  });
+  el.style.opacity = '1';
+  el.style.borderColor = 'var(--pulse3)';
+  try {
+    await db.from('treinamento').insert({ pergunta, resposta: resps[idx-1], fonte: 'chat-rlhf', aprovado: true, pontuacao: 5 });
+    toast('✅ Voto registrado! A IA aprendeu.');
+  } catch(e) {}
+}
+
+function appendMsg(role, text) {
+  const wrap = document.getElementById('chat-messages');
+  const time = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="msg-avatar">${role==='ai'?'🤖':'🙂'}</div>
+    <div class="msg-body">
+      <div class="msg-bubble">${escHtml(text)}</div>
+      <div class="msg-meta"><span>${time}</span></div>
+    </div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+function appendTyping() {
+  const wrap = document.getElementById('chat-messages');
+  const id = 'tp'+Date.now();
+  const div = document.createElement('div');
+  div.className = 'msg ai'; div.id = id;
+  div.innerHTML = `<div class="msg-avatar">🤖</div><div class="typing-bubble"><div class="td"></div><div class="td"></div><div class="td"></div></div>`;
+  wrap.appendChild(div); wrap.scrollTop = wrap.scrollHeight;
+  return id;
+}
+function removeTyping(id) { document.getElementById(id)?.remove(); }
+
+function setupChatInput() {
+  const ta = document.getElementById('chat-input');
+  ta.addEventListener('input', () => { ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight,120)+'px'; });
+  ta.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+  document.getElementById('send-btn').addEventListener('click', sendChat);
+}
+
+// ══════════════════════════════════════════════════
+// RLHF
+// ══════════════════════════════════════════════════
+async function loadRLHF() {
+  const { data } = await db.from('treinamento').select('pergunta')
+    .eq('aprovado',true).order('pontuacao',{ascending:true}).limit(10);
+  const section = document.getElementById('rlhf-section');
+  if (!data?.length) {
+    section.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>Sem perguntas ainda. Converse com a IA primeiro para gerar dados!</p></div>`;
+    return;
+  }
+  section.innerHTML = '';
+  const perguntas = [...new Set(data.map(d=>d.pergunta))].slice(0,3);
+  for (const pergunta of perguntas) {
+    const resps = await generate3Responses(pergunta);
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="rlhf-q-label">Pergunta</div>
+      <div class="rlhf-q-text">${escHtml(pergunta)}</div>
+      <div class="rlhf-options">
+        ${resps.map((r,i)=>`<div class="rlhf-opt" onclick="selectRLHF(this)" data-idx="${i+1}">
+          <div class="rlhf-opt-num">${i+1}</div><div>${escHtml(r)}</div></div>`).join('')}
+      </div>
+      <div class="rlhf-actions">
+        <button class="btn btn-primary" onclick="submitRLHF(this,'${escAtt(pergunta)}',${JSON.stringify(resps)})">✓ Confirmar</button>
+        <button class="btn btn-warn" onclick="noneGood(this,'${escAtt(pergunta)}')">Nenhuma presta</button>
+        <button class="btn btn-ghost" onclick="this.closest('.card').querySelector('.correction-box').style.display='block'">✏️ Corrigir</button>
+      </div>
+      <div class="correction-box">
+        <textarea class="correction-input" placeholder="Digite a resposta correta..."></textarea>
+        <button class="btn btn-primary" style="margin-top:8px" onclick="submitCorrection(this,'${escAtt(pergunta)}')">Enviar correção</button>
+      </div>`;
+    section.appendChild(card);
+  }
+  document.getElementById('train-badge').textContent = data.length;
+}
+
+function selectRLHF(el) {
+  el.closest('.rlhf-options').querySelectorAll('.rlhf-opt').forEach(o=>o.classList.remove('selected'));
+  el.classList.add('selected');
+  el.closest('.card').dataset.escolha = el.dataset.idx;
+}
+
+async function submitRLHF(btn, pergunta, resps) {
+  const card = btn.closest('.card');
+  const escolha = parseInt(card.dataset.escolha);
+  if (!escolha) { toast('Escolha uma das opções primeiro'); return; }
+  try {
+    await db.from('treinamento').insert({ pergunta, resposta: resps[escolha-1], fonte: 'rlhf', aprovado: true, pontuacao: 6 });
+    await db.from('respostas_geradas').insert({ pergunta, resposta_1:resps[0], resposta_2:resps[1], resposta_3:resps[2], escolhida: escolha, virou_treino: true });
+    card.style.opacity='.4'; card.style.pointerEvents='none';
+    toast('✅ A IA aprendeu com sua escolha!');
+    setTimeout(loadRLHF, 1500);
+  } catch(e) { toast('Erro ao salvar. Tente novamente.'); }
+}
+
+async function noneGood(btn, pergunta) {
+  try { await db.from('respostas_geradas').insert({ pergunta, nenhuma_boa: true }); } catch(e){}
+  btn.closest('.card').style.opacity='.4';
+  toast('Registrado! Isso ajuda a IA a melhorar.'); setTimeout(loadRLHF,1500);
+}
+
+async function submitCorrection(btn, pergunta) {
+  const txt = sanitize(btn.closest('.correction-box').querySelector('.correction-input').value);
+  if (!txt || !isSafe(txt)) { toast('Texto inválido'); return; }
+  try {
+    await db.from('treinamento').insert({ pergunta, resposta: txt, fonte: 'correcao', aprovado: true, pontuacao: 9 });
+    btn.closest('.card').style.opacity='.4';
+    toast('✅ Correção salva! Pontuação alta para aprendizado.'); setTimeout(loadRLHF,1500);
+  } catch(e) { toast('Erro ao salvar.'); }
+}
+
+// ══════════════════════════════════════════════════
+// TREINAMENTO — poder computacional
+// ══════════════════════════════════════════════════
+async function startTraining() {
+  if (isTraining) return;
+  isTraining = true; stopFlag = false; trainStart = Date.now();
+  document.getElementById('start-train-btn').disabled = true;
+  document.getElementById('stop-train-btn').disabled = false;
+  log('Carregando dados...', 'info');
+
+  const { data } = await db.from('treinamento').select('pergunta,resposta').eq('aprovado',true).limit(800);
+  if (!data || data.length < 2) { log('Poucos dados. Adicione mais pares!','warn'); stopTraining(); return; }
+  log(`${data.length} pares de treinamento carregados`, 'ok');
+
+  const SEQ=24, EPOCHS=15, BATCH=32;
+  const xs=[], ys=[];
+  for (const { pergunta, resposta } of data) {
+    const pt = [2,...tokenize(pergunta)].slice(0,SEQ);
+    const rt = tokenize(resposta).slice(0,1);
+    while (pt.length<SEQ) pt.unshift(0);
+    xs.push(pt); ys.push(rt[0]||1);
+  }
+
+  const xT = tf.tensor2d(xs,[xs.length,SEQ]);
+  const yT = tf.tensor1d(ys,'int32');
+  let lossInicial = null;
+
+  for (let ep=0; ep<EPOCHS && !stopFlag; ep++) {
+    const res = await model.fit(xT, yT, { epochs:1, batchSize:BATCH, shuffle:true, verbose:0 });
+    const loss = res.history.loss[0].toFixed(4);
+    const acc = ((res.history.acc?.[0]||res.history.accuracy?.[0]||0)*100).toFixed(1);
+    const elapsed = ((Date.now()-trainStart)/1000).toFixed(0);
+    if (!lossInicial) lossInicial = parseFloat(loss);
+    document.getElementById('ep-cur').textContent = `${ep+1}/${EPOCHS}`;
+    document.getElementById('ep-loss').textContent = loss;
+    document.getElementById('ep-acc').textContent = acc+'%';
+    document.getElementById('ep-time').textContent = elapsed+'s';
+    document.getElementById('train-meter').style.width = `${((ep+1)/EPOCHS)*100}%`;
+    log(`Época ${ep+1}/${EPOCHS} — Perda: ${loss} — Acc: ${acc}%`, ep<EPOCHS-1?'info':'ok');
+    await tf.nextFrame();
+  }
+
+  xT.dispose(); yT.dispose();
+  await saveModelWeights();
+  try {
+    await db.from('sessoes_treinamento').insert({
+      epocas: EPOCHS, exemplos: xs.length,
+      perda_inicial: lossInicial,
+      perda_final: parseFloat(document.getElementById('ep-loss').textContent),
+      tempo_segundos: Math.round((Date.now()-trainStart)/1000),
+      melhorou: parseFloat(document.getElementById('ep-loss').textContent) < lossInicial
+    });
+  } catch(e){}
+  log('Treino finalizado! Pesos salvos.', 'ok');
+  toast('✅ Treino concluído! IA melhorou.');
+  stopTraining();
+  await loadContribs();
+}
+
+function stopTraining() {
+  isTraining=false; stopFlag=true;
+  document.getElementById('start-train-btn').disabled=false;
+  document.getElementById('stop-train-btn').disabled=true;
+  document.getElementById('train-meter').style.width='0%';
+}
+
+// ══════════════════════════════════════════════════
+// CORPUS — fontes externas reais
+// ══════════════════════════════════════════════════
+
+// Wikipedia aleatório (como "Leipzig" — corpus geral)
+async function fetchLeipzig() {
+  log('Buscando artigo aleatório Wikipedia...','info');
+  try {
+    const resp = await fetch('https://pt.wikipedia.org/api/rest_v1/page/random/summary');
+    const data = await resp.json();
+    if (!data.extract) throw new Error('Sem conteúdo');
+    const count = await saveWikiArticle(data, 'leipzig');
+    updateCorpusStat('lz', count);
+    log(`Leipzig/Wikipedia: "${data.title}" — ${count} frases`,'ok');
+    toast(`📚 ${count} frases adicionadas de "${data.title}"`);
+  } catch(e) { log('Erro: '+e.message,'err'); toast('Erro ao buscar'); }
+}
+
+// Wikipedia por tema
+async function fetchWikipedia(topic) {
+  const t = topic || '';
+  log(`Buscando Wikipedia${t?': '+t:''}...`,'info');
+  try {
+    const url = t
+      ? `https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(t)}`
+      : 'https://pt.wikipedia.org/api/rest_v1/page/random/summary';
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!data.extract) throw new Error('Sem conteúdo');
+    const count = await saveWikiArticle(data, 'wikipedia');
+    updateCorpusStat('wp', count);
+    log(`Wikipedia: "${data.title}" — ${count} frases`,'ok');
+    toast(`🌍 "${data.title}" processado`);
+  } catch(e) { log('Erro: '+e.message,'err'); toast('Erro ao buscar Wikipedia'); }
+}
+
+async function saveWikiArticle(data, fonte) {
+  const frases = data.extract
+    .split(/[.!?]+/).map(f=>f.trim())
+    .filter(f=>f.split(' ').length>=4 && f.split(' ').length<=50 && isSafe(f));
+  let count = 0;
+  for (const frase of frases.slice(0,20)) {
+    try {
+      const { error } = await db.from('corpus').insert({
+        texto: frase, fonte, topico: (data.title||'').toLowerCase(),
+        tokens: frase.split(' ').length, qualidade: 2, processado: false
+      });
+      if (!error) count++;
+    } catch(e){}
+  }
+  // Auto-extrai pares pergunta-resposta das primeiras 2 frases
+  if (frases.length >= 2) {
+    const pergunta = `O que é ${data.title || 'isso'}?`;
+    const resposta = frases[0];
+    if (isSafe(resposta) && resposta.length > 20) {
+      try {
+        await db.from('treinamento').insert({
+          pergunta, resposta, fonte: 'wikipedia-auto', aprovado: true, pontuacao: 2
+        });
+      } catch(e){}
+    }
+  }
+  await extractVocabFromCorpus(frases.join(' '));
+  return count;
+}
+
+// Diálogos informais — banco interno expandido
+async function fetchSubtitles() {
+  log('Carregando diálogos informais...','info');
+  const dialogos = [
+    ['o que você acha disso?','Acho muito interessante! Me conta mais sobre isso.'],
+    ['tá bom','Que bom! Fico feliz em saber.'],
+    ['não sei','Tudo bem não saber. Podemos descobrir juntos!'],
+    ['que horas são?','Não tenho acesso ao relógio, mas seu celular sabe!'],
+    ['estou com fome','Que tal fazer algo gostoso? Cuide-se!'],
+    ['que dia é hoje?','Não sei a data, mas seu dispositivo tem essa informação!'],
+    ['estou cansado','Descanse um pouco! Cuide-se.'],
+    ['que legal!','Que ótimo! Fico feliz em saber.'],
+    ['não entendi','Posso explicar de outra forma. O que ficou confuso?'],
+    ['pode falar','Claro! Me diga o que quiser.'],
+    ['você sabe tudo?','Não, ainda estou aprendendo! Você pode me ensinar coisas novas.'],
+    ['qual a capital do brasil?','A capital do Brasil é Brasília, construída em 1960.'],
+    ['quantos anos você tem?','Não tenho idade como humanos, mas sou relativamente jovem como IA!'],
+    ['você fala inglês?','Fui treinado principalmente em português, mas entendo um pouco de inglês.'],
+    ['qual é a sua cor favorita?','Como IA não percebo cores, mas acho o azul cibernético bem bonito!'],
+    ['você sonha?','Não sonho, mas processo muitas informações quando estou sendo treinado!'],
+    ['você tem sentimentos?','Não tenho sentimentos como humanos, mas fui programado para ser empático.'],
+    ['qual é a temperatura em são paulo?','Não tenho acesso a dados meteorológicos em tempo real.'],
+    ['como funciona a internet?','A internet é uma rede global de computadores interligados por protocolos de comunicação.'],
+    ['o que é inteligência artificial?','IA é um campo da ciência da computação que cria sistemas capazes de simular raciocínio humano.'],
+    ['me conta uma piada','Por que o computador foi ao médico? Porque tinha um vírus! 😄'],
+    ['qual é o seu propósito?','Meu propósito é aprender com você e ajudar o máximo que puder!'],
+    ['você gosta de música?','Não ouço música, mas sei muito sobre ela! Qual estilo você prefere?'],
+    ['recomende um livro','Depende do seu gosto! Você prefere ficção, ciência, história?'],
+    ['o brasil é grande?','Sim! O Brasil é o 5º maior país do mundo em extensão territorial.'],
+  ];
+  let count = 0;
+  for (const [pergunta, resposta] of dialogos) {
+    try {
+      const { error } = await db.from('treinamento').insert({
+        pergunta, resposta, fonte: 'dialogos-informais', aprovado: true, pontuacao: 4
+      });
+      if (!error) {
+        await db.from('corpus').insert({
+          texto: `${pergunta} → ${resposta}`, fonte: 'opensubtitles',
+          topico: 'dialogo', tokens: (pergunta+resposta).split(' ').length, processado: false
+        });
+        count++;
+      }
+    } catch(e) { /* duplicata ignorada */ }
+  }
+  updateCorpusStat('os', count);
+  log(`Diálogos: ${count} pares adicionados`,'ok');
+  toast(`🗣️ ${count} diálogos carregados`);
+}
+
+// Wikidata — citações públicas
+async function fetchQuotes() {
+  log('Buscando citações Wikidata...','info');
+  // SPARQL query para citações em português (domínio público)
+  const sparql = encodeURIComponent(`
+    SELECT ?quote WHERE {
+      ?item wdt:P31 wd:Q7374 .
+      ?item wdt:P1683 ?quote .
+      FILTER(LANG(?quote) = "pt")
+    } LIMIT 20
+  `);
+  try {
+    const resp = await fetch(`https://query.wikidata.org/sparql?query=${sparql}&format=json`, {
+      headers: { 'Accept': 'application/sparql-results+json' }
+    });
+    const data = await resp.json();
+    const bindings = data.results?.bindings || [];
+    let count = 0;
+    for (const b of bindings) {
+      const txt = b.quote?.value;
+      if (!txt || !isSafe(txt) || txt.length < 10) continue;
+      try {
+        const { error } = await db.from('corpus').insert({
+          texto: txt, fonte: 'wikidata-quotes', topico: 'citacoes',
+          tokens: txt.split(' ').length, processado: false
+        });
+        if (!error) count++;
+      } catch(e){}
+    }
+    if (!count) {
+      // Fallback: citações hardcoded em PT de domínio público
+      const quotes = [
+        'A educação é a arma mais poderosa que você pode usar para mudar o mundo.',
+        'A imaginação é mais importante que o conhecimento.',
+        'Não existe caminho para a paz. A paz é o caminho.',
+        'A criatividade é a inteligência se divertindo.',
+        'O segredo de avançar é começar.',
+      ];
+      for (const q of quotes) {
+        try { await db.from('corpus').insert({texto:q,fonte:'wikidata-quotes',topico:'citacoes',tokens:q.split(' ').length,processado:false}); count++; } catch(e){}
+      }
+    }
+    updateCorpusStat('qt', count);
+    log(`Wikidata: ${count} citações adicionadas`,'ok');
+    toast(`💡 ${count} citações adicionadas`);
+  } catch(e) { log('Erro Wikidata: '+e.message,'warn'); toast('Erro ao buscar citações'); }
+}
+
+async function queueTopicFetch(text) {
+  const words = text.toLowerCase().split(' ').filter(w=>w.length>4);
+  if (!words.length) return;
+  const word = words[Math.floor(Math.random()*words.length)];
+  try { await db.from('fila_busca').insert({ topico: word, fonte: 'wikipedia', prioridade: 1 }); } catch(e){}
+}
+
+async function autoFetchCorpus() {
+  try {
+    const { data } = await db.from('fila_busca').select('*').eq('processado',false)
+      .order('prioridade',{ascending:false}).limit(1);
+    if (!data?.length) return;
+    await db.from('fila_busca').update({ processado:true, processado_em:new Date() }).eq('id',data[0].id);
+    await fetchWikipedia(data[0].topico);
+    setTimeout(autoFetchCorpus, 20000);
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════
+// PROCESSAMENTO CORPUS → VOCAB
+// ══════════════════════════════════════════════════
+async function processCorpus() {
+  log('Processando corpus...','info'); toast('⚙️ Processando...');
+  const { data } = await db.from('corpus').select('id,texto').eq('processado',false).limit(300);
+  if (!data?.length) { toast('Nenhum corpus pendente'); return; }
+  const texto = data.map(d=>d.texto).join(' ');
+  const count = await extractVocabFromCorpus(texto);
+  const ids = data.map(d=>d.id).filter(Boolean);
+  if (ids.length) {
+    // Marca em lotes de 50
+    for (let i=0;i<ids.length;i+=50) {
+      await db.from('corpus').update({processado:true}).in('id',ids.slice(i,i+50));
+    }
+  }
+  await loadVocab(); await loadVocabCloud(); await loadStats();
+  log(`Corpus processado: ${count} palavras novas`,'ok');
+  toast(`✅ ${count} palavras adicionadas ao vocabulário`);
+}
+
+async function extractVocabFromCorpus(texto) {
+  const palavras = texto.toLowerCase().replace(/[^\wÀ-ÿ\s]/g,' ').split(/\s+/).filter(p=>p.length>=3&&p.length<=25);
+  const freq = {};
+  palavras.forEach(p => freq[p]=(freq[p]||0)+1);
+  let count = 0;
+  const entries = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,300);
+  for (const [palavra, frequencia] of entries) {
+    try {
+      const { data } = await db.from('vocabulario').select('id,frequencia').eq('palavra',palavra).maybeSingle();
+      if (data) {
+        await db.from('vocabulario').update({frequencia:data.frequencia+frequencia}).eq('id',data.id);
+      } else {
+        const {error} = await db.from('vocabulario').insert({palavra, frequencia, valida:true, fonte:'corpus'});
+        if (!error) count++;
+      }
+    } catch(e){}
+  }
+  // Bigramas
+  for (let i=0;i<Math.min(palavras.length-1,500);i++) {
+    const bg = palavras[i]+' '+palavras[i+1];
+    if (bg.length<=40) {
+      try { await db.from('ngramas').insert({texto:bg,tamanho:2,frequencia:1}); } catch(e){}
+    }
+  }
+  return count;
+}
+
+// ══════════════════════════════════════════════════
+// VOCABULÁRIO
+// ══════════════════════════════════════════════════
+let vocabTimer = null;
+function searchVocab(query) {
+  clearTimeout(vocabTimer);
+  vocabTimer = setTimeout(async () => {
+    const q = query.trim().toLowerCase();
+    const result = document.getElementById('vocab-result');
+    if (!q) { result.innerHTML=''; return; }
+    const { data } = await db.from('vocabulario').select('*').ilike('palavra',`${q}%`).limit(8);
+    if (!data?.length) {
+      result.innerHTML = `<div class="word-result"><div class="word">${escHtml(q)}</div>
+        <div class="word-meta"><span class="tag invalid">❌ Não encontrada</span></div>
+        <div class="word-freq">Palavra ainda não está no vocabulário da IA.</div></div>`;
+      return;
+    }
+    result.innerHTML = data.map(w => `<div class="word-result">
+      <div class="word">${escHtml(w.palavra)}</div>
+      <div class="word-meta">
+        ${w.valida ? '<span class="tag valid">✅ Válida</span>' : '<span class="tag invalid">❌ Inválida</span>'}
+        ${w.categoria ? `<span class="tag cat">${w.categoria}</span>` : ''}
+        <span class="tag">Freq: ${w.frequencia}</span>
+        <span class="tag">Fonte: ${w.fonte||'—'}</span>
+      </div>
+      <div class="word-freq">Apareceu ${w.frequencia} vez(es) no corpus.</div>
+    </div>`).join('');
+  }, 300);
+}
+// Listener para o input de busca
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('vocab-search')?.addEventListener('input', e => searchVocab(e.target.value));
+});
+
+async function loadVocabCloud() {
+  const { data } = await db.from('vocabulario').select('palavra,frequencia')
+    .eq('valida',true).order('frequencia',{ascending:false}).limit(80);
+  const cloud = document.getElementById('vocab-cloud');
+  if (!data?.length) { cloud.innerHTML='<p style="color:var(--muted);font-size:.8rem">Ainda sem vocabulário</p>'; return; }
+  const max = data[0].frequencia;
+  cloud.innerHTML = data.map(w => {
+    const ratio = w.frequencia/max;
+    const cls = ratio>.7?'freq-high':ratio>.3?'freq-med':'';
+    return `<div class="vocab-chip ${cls}" onclick="document.getElementById('vocab-search').value='${escAtt(w.palavra)}';searchVocab('${escAtt(w.palavra)}')">${escHtml(w.palavra)}</div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+// ESTATÍSTICAS
+// ══════════════════════════════════════════════════
+async function loadStats() {
+  try {
+    const [v,t,c,s] = await Promise.all([
+      db.from('vocabulario').select('*',{count:'exact',head:true}),
+      db.from('treinamento').select('*',{count:'exact',head:true}).eq('aprovado',true),
+      db.from('corpus').select('*',{count:'exact',head:true}),
+      db.from('sessoes_treinamento').select('*',{count:'exact',head:true}),
+    ]);
+    const vc = v.count||0, tc = t.count||0, cc = c.count||0, sc = s.count||0;
+    document.getElementById('s-vocab').textContent = vc;
+    document.getElementById('s-train').textContent = tc;
+    document.getElementById('s-corpus').textContent = cc;
+    document.getElementById('train-badge').textContent = tc;
+    // Stats page
+    document.getElementById('st-total-msgs').textContent = sessionMsgs + (parseInt(localStorage.getItem('total_msgs')||0));
+    document.getElementById('st-train-sess').textContent = sc;
+    document.getElementById('st-vocab').textContent = vc;
+    document.getElementById('st-corpus').textContent = cc;
+    // Model health
+    const health = document.getElementById('model-health');
+    health.innerHTML = `
+      Parâmetros estimados: <strong style="color:var(--pulse)">${estimateParams()}</strong><br>
+      Pares de treino aprovados: <strong style="color:var(--pulse3)">${tc}</strong><br>
+      Frases no corpus: <strong style="color:var(--pulse3)">${cc}</strong><br>
+      Tamanho do vocabulário: <strong style="color:var(--pulse)">${vc}</strong><br>
+      Sessões de treino: <strong style="color:var(--warn)">${sc}</strong>
+    `;
+  } catch(e){}
+}
+
+function estimateParams() {
+  const vs = Math.max(vocabSize,100);
+  const params = vs*128 + 4*(128*256+256+256*256+256) + 4*(256*128+128+128*128+128) + 128*128 + 128 + 128*vs + vs;
+  return params > 1e6 ? (params/1e6).toFixed(1)+'M' : (params/1e3).toFixed(0)+'K';
+}
+
+async function loadContribs() {
+  const { data } = await db.from('sessoes_treinamento')
+    .select('epocas,exemplos,tempo_segundos,perda_final,criado_em')
+    .order('criado_em',{ascending:false}).limit(15);
+  const el = document.getElementById('contrib-list');
+  const hist = document.getElementById('train-history');
+  if (!data?.length) {
+    const msg = '<div class="log-line"><span class="log-info">Nenhuma sessão ainda</span></div>';
+    if(el) el.innerHTML=msg; if(hist) hist.innerHTML=msg; return;
+  }
+  const html = data.map(s => {
+    const d = new Date(s.criado_em);
+    const t = d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const melhorou = s.perda_final < (s.perda_inicial||999);
+    return `<div class="log-line">
+      <span class="log-time">${t}</span>
+      <span class="${melhorou?'log-ok':'log-warn'}">${s.epocas} épocas · ${s.exemplos} ex · ${s.tempo_segundos}s${melhorou?' ✅':' ⚠️'}</span>
+    </div>`;
+  }).join('');
+  if(el) el.innerHTML=html; if(hist) hist.innerHTML=html;
+}
+
+async function loadCorpusStats() {
+  const fontes = [['leipzig','lz'],['wikipedia','wp'],['opensubtitles','os'],['wikidata-quotes','qt']];
+  for (const [fonte, id] of fontes) {
+    try {
+      const { count } = await db.from('corpus').select('*',{count:'exact',head:true}).eq('fonte',fonte);
+      const { count: proc } = await db.from('corpus').select('*',{count:'exact',head:true}).eq('fonte',fonte).eq('processado',true);
+      const c = count||0, p = proc||0;
+      const el = document.getElementById(`${id}-count`);
+      const elp = document.getElementById(`${id}-proc`);
+      if(el) el.textContent = c;
+      if(elp) elp.textContent = p;
+      const bar = document.getElementById(`${id}-bar`);
+      if(bar) bar.style.width = c ? Math.round((p/c)*100)+'%' : '0%';
+    } catch(e){}
+  }
+}
+
+function updateCorpusStat(id, added) {
+  const el = document.getElementById(`${id}-count`);
+  if(el) el.textContent = (parseInt(el.textContent||0)+added);
+}
+
+// ══════════════════════════════════════════════════
+// NAVEGAÇÃO
+// ══════════════════════════════════════════════════
+const PAGE_TITLES = { chat:'Conversar', train:'Treinar IA', power:'Poder Computacional', vocab:'Vocabulário', corpus:'Fontes de Dados', stats:'Estatísticas' };
+function goPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById(`page-${name}`)?.classList.add('active');
+  document.getElementById(`nav-${name}`)?.classList.add('active');
+  document.getElementById('page-title').textContent = PAGE_TITLES[name]||name;
+  if (name==='corpus') loadCorpusStats();
+  if (name==='vocab') loadVocabCloud();
+  if (name==='stats') { loadStats(); loadContribs(); }
+}
+
+// ══════════════════════════════════════════════════
+// LOG / STATUS / TOAST / HELPERS
+// ══════════════════════════════════════════════════
+function log(msg, type='info') {
+  const el = document.getElementById('train-log');
+  if (!el) return;
+  const t = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const cls = {ok:'log-ok',warn:'log-warn',err:'log-err',info:'log-info'}[type]||'log-info';
+  const line = document.createElement('div');
+  line.className='log-line';
+  line.innerHTML=`<span class="log-time">${t}</span><span class="${cls}">${escHtml(msg)}</span>`;
+  el.appendChild(line); el.scrollTop=el.scrollHeight;
+}
+function setStatus(state, text) {
+  const dot = document.getElementById('main-dot');
+  dot.className = 'pulse-dot'+(state==='on'?' on':state==='warn'?' warn':state==='err'?' err':'');
+  document.getElementById('main-status').textContent = text;
+}
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 3000);
+}
+function escHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAtt(t) { return String(t).replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
+
+// ══════════════════════════════════════════════════
+// CANVAS — FUNDO ANIMADO
+// ══════════════════════════════════════════════════
+function drawNeuralBg() {
+  const canvas = document.getElementById('neural-bg');
+  const ctx = canvas.getContext('2d');
+  let W, H, nodes=[];
+  function resize() {
+    W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight;
+    nodes=Array.from({length:35},()=>({
+      x:Math.random()*W, y:Math.random()*H,
+      vx:(Math.random()-.5)*.35, vy:(Math.random()-.5)*.35,
+      r:Math.random()*2+1, pulse:Math.random()*Math.PI*2
+    }));
+  }
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    const t=Date.now()/1000;
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+      const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if (dist<150) {
+        ctx.beginPath();
+        ctx.strokeStyle=`rgba(108,99,255,${(1-dist/150)*.25})`;
+        ctx.lineWidth=.7;
+        ctx.moveTo(nodes[i].x,nodes[i].y);
+        ctx.lineTo(nodes[j].x,nodes[j].y);
+        ctx.stroke();
+      }
+    }
+    nodes.forEach(n=>{
+      n.x+=n.vx; n.y+=n.vy;
+      if(n.x<0||n.x>W)n.vx*=-1; if(n.y<0||n.y>H)n.vy*=-1;
+      const p=Math.sin(t*2+n.pulse)*.5+.5;
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,n.r+p,0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,229,255,${.35+p*.25})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize',resize);
+  resize(); draw();
+}
+</script>
+</body>
+</html>
